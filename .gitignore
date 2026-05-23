@@ -1,0 +1,57 @@
+# macOS
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Linux
+*~
+
+# Editors / IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+.zed/
+
+# Logs & temp
+*.log
+logs/
+*.tmp
+.cache/
+
+# Environment / secrets
+.env
+.env.*
+*.env
+
+# Node (in case tooling is added later)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Chrome extension build artifacts
+*.zip
+*.crx
+*.pem
+dist/
+build/
+web-ext-artifacts/
+
+# Claude / AI tool directories (may contain conversation history, settings, transcripts)
+.claude/
+.claude-code/
+.cursor/
+CLAUDE.md
+
+# Internal project docs — not for public release
+conversation_summary.md
+# Original German concept/spec doc — remove this line if you want to ship it publicly
+inspect_overlay_konzept.md

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DOMLens — Options</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main class="container">
+      <header>
+        <h1>DOMLens</h1>
+        <p class="lead">
+          Hold the configured hotkey and move your mouse over elements.
+          The hovered element is highlighted and an info panel shows the tag,
+          classes, dimensions, position, colors, and typography. Releasing the hotkey hides everything.
+          Press <strong>C</strong> while holding the hotkey to copy a unique CSS selector
+          (plus any visible text) to the clipboard —
+          the highlight briefly flashes green to confirm.
+          Press <strong>C twice</strong> in quick succession to copy a full snapshot of the element
+          (HTML, box, computed styles, and text).
+        </p>
+      </header>
+
+      <section class="card">
+        <h2>Hotkey</h2>
+        <p class="hint">
+          Select one or more modifier keys. All selected keys must be held
+          <em>simultaneously</em> to activate inspect mode.
+        </p>
+
+        <fieldset class="modifiers">
+          <label>
+            <input type="checkbox" data-modifier="Alt" />
+            <span class="key">Alt</span>
+            <span class="subtle" data-platform-label="Alt"></span>
+          </label>
+          <label>
+            <input type="checkbox" data-modifier="Control" />
+            <span class="key">Control</span>
+            <span class="subtle">(Ctrl)</span>
+          </label>
+          <label>
+            <input type="checkbox" data-modifier="Meta" />
+            <span class="key">Meta</span>
+            <span class="subtle" data-platform-label="Meta"></span>
+          </label>
+          <label>
+            <input type="checkbox" data-modifier="Shift" />
+            <span class="key">Shift</span>
+            <span class="subtle">(Shift key)</span>
+          </label>
+        </fieldset>
+
+        <div class="status" id="status">Loading…</div>
+      </section>
+    </main>
+
+    <script src="../shared/settings.js"></script>
+    <script src="options.js"></script>
+  </body>
+</html>
