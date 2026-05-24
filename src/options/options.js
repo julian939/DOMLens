@@ -1,5 +1,5 @@
 (async () => {
-  const { DEFAULTS, load, save, onChange, MODIFIER_KEYS, INFO_FIELD_DEFAULTS } = globalThis.InspectSettings;
+  const { DEFAULTS, load, save, onChange, MODIFIER_KEYS, INFO_FIELD_DEFAULTS, DEFAULT_SNAPSHOT_OPTIONS } = globalThis.InspectSettings;
   const { GROUPS, REGISTRY } = globalThis.InfoFields;
 
   const hotkeyRecorder = document.getElementById('hotkey-recorder');
@@ -9,7 +9,10 @@
   const statusEl = document.getElementById('status');
   const leadText = document.getElementById('lead-text');
   const infoFieldsContainer = document.getElementById('info-fields');
+  const includeScreenshotCb = document.getElementById('include-screenshot');
   const resetButton = document.getElementById('reset-button');
+
+  includeScreenshotCb.addEventListener('change', persist);
 
   const isMac = /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent || '');
 
@@ -167,7 +170,8 @@
     currentSettings = {
       hotkey: { ...settings.hotkey },
       actionKey: { ...settings.actionKey },
-      infoFields: { ...settings.infoFields }
+      infoFields: { ...settings.infoFields },
+      snapshot: { ...settings.snapshot }
     };
 
     hotkeyDisplay.textContent = prettyKeyLabel(settings.hotkey);
@@ -179,6 +183,9 @@
     infoFieldCheckboxes.forEach((cb) => {
       cb.checked = !!infoFields[cb.dataset.field];
     });
+
+    const snapshot = settings.snapshot || DEFAULT_SNAPSHOT_OPTIONS;
+    includeScreenshotCb.checked = !!snapshot.includeScreenshot;
   }
 
   function renderStatus(settings) {
@@ -225,7 +232,8 @@
     const settings = {
       hotkey: currentSettings.hotkey,
       actionKey: currentSettings.actionKey,
-      infoFields: readInfoFields()
+      infoFields: readInfoFields(),
+      snapshot: { includeScreenshot: includeScreenshotCb.checked }
     };
     await save(settings);
     renderStatus(settings);
@@ -240,7 +248,8 @@
     const defaults = {
       hotkey: { ...DEFAULTS.hotkey },
       actionKey: { ...DEFAULTS.actionKey },
-      infoFields: { ...INFO_FIELD_DEFAULTS }
+      infoFields: { ...INFO_FIELD_DEFAULTS },
+      snapshot: { ...DEFAULT_SNAPSHOT_OPTIONS }
     };
     await save(defaults);
     render(defaults);

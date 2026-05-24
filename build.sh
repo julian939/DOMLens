@@ -23,10 +23,10 @@ required=(
   "src/options/options.html"
   "src/options/options.js"
   "src/options/options.css"
-  "icons/icon16.png"
-  "icons/icon32.png"
-  "icons/icon48.png"
-  "icons/icon128.png"
+  "assets/icons/icon16.png"
+  "assets/icons/icon32.png"
+  "assets/icons/icon48.png"
+  "assets/icons/icon128.png"
 )
 for f in "${required[@]}"; do
   if [[ ! -f "$f" ]]; then
@@ -44,10 +44,10 @@ zip -r -X "$OUTPUT" \
   src/options/options.html \
   src/options/options.js \
   src/options/options.css \
-  icons/icon16.png \
-  icons/icon32.png \
-  icons/icon48.png \
-  icons/icon128.png \
+  assets/icons/icon16.png \
+  assets/icons/icon32.png \
+  assets/icons/icon48.png \
+  assets/icons/icon128.png \
   LICENSE \
   > /dev/null
 

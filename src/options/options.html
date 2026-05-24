@@ -61,6 +61,24 @@
         <div class="info-fields" id="info-fields"></div>
       </section>
 
+      <section class="card">
+        <h2>Snapshot options</h2>
+        <p class="hint">
+          Configure what the full snapshot (double action key press) includes.
+        </p>
+
+        <label class="field snapshot-toggle">
+          <input type="checkbox" id="include-screenshot" />
+          <span>
+            Include element screenshot
+            <span class="field-sub">
+              Captures the visible tab and crops the element. Disable for a
+              text-only JSON snapshot (smaller, faster, no overlay flicker).
+            </span>
+          </span>
+        </label>
+      </section>
+
       <section class="card reset-card">
         <div class="reset-row">
           <div>

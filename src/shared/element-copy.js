@@ -65,23 +65,6 @@
     /[a-f0-9]{6,}/i
   ];
 
-  const CURATED_STYLE_PROPS = [
-    'display', 'position', 'top', 'right', 'bottom', 'left',
-    'width', 'height', 'min-width', 'min-height', 'max-width', 'max-height',
-    'margin', 'padding', 'border', 'border-radius', 'box-sizing',
-    'box-shadow', 'opacity', 'visibility', 'overflow', 'z-index',
-    'background', 'background-color', 'background-image',
-    'color', 'font-family', 'font-size', 'font-weight', 'font-style',
-    'line-height', 'letter-spacing', 'text-align', 'text-decoration',
-    'text-transform', 'white-space',
-    'flex', 'flex-direction', 'flex-wrap', 'justify-content', 'align-items',
-    'align-content', 'align-self', 'gap', 'order',
-    'grid-template-columns', 'grid-template-rows', 'grid-area',
-    'grid-column', 'grid-row',
-    'transform', 'transform-origin', 'transition', 'animation',
-    'cursor', 'pointer-events', 'user-select'
-  ];
-
   function escapeHtml(s) {
     return String(s)
       .replace(/&/g, '&amp;')
@@ -313,59 +296,85 @@
     return buildFullPath(el);
   }
 
-  function collectCuratedStyles(el) {
-    const cs = getComputedStyle(el);
-    const lines = [];
-    for (const prop of CURATED_STYLE_PROPS) {
-      const value = cs.getPropertyValue(prop);
-      if (!value) continue;
-      const trimmed = value.trim();
-      if (!trimmed) continue;
-      if (trimmed === 'none' || trimmed === 'normal' || trimmed === 'auto' ||
-          trimmed === '0px' || trimmed === 'rgba(0, 0, 0, 0)') {
-        continue;
-      }
-      lines.push(`${prop}: ${trimmed}`);
-    }
-    return lines.join('\n');
-  }
-
   function extractFullVisibleText(el) {
     if (!el) return '';
     return (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
   }
 
-  function buildSnapshot(el) {
+  function buildMeta() {
+    return {
+      url: location.href,
+      viewport: {
+        width: window.innerWidth,
+        height: window.innerHeight
+      },
+      devicePixelRatio: window.devicePixelRatio || 1,
+      capturedAt: new Date().toISOString()
+    };
+  }
+
+  function requestViewportCapture() {
+    return new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage({ type: 'captureVisibleTab' }, (response) => {
+          if (chrome.runtime.lastError) {
+            resolve(null);
+            return;
+          }
+          if (!response || !response.ok || !response.dataUrl) {
+            resolve(null);
+            return;
+          }
+          resolve(response.dataUrl);
+        });
+      } catch (_) {
+        resolve(null);
+      }
+    });
+  }
+
+  async function captureElementScreenshot(box, devicePixelRatio) {
+    if (box.width <= 0 || box.height <= 0) return null;
+    const dataUrl = await requestViewportCapture();
+    if (!dataUrl) return null;
+    try {
+      const base64 = await globalThis.ScreenshotCrop.cropViewportPng(dataUrl, box, devicePixelRatio);
+      if (!base64) return null;
+      return {
+        mimeType: 'image/png',
+        encoding: 'base64',
+        data: base64
+      };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  async function buildSnapshot(el, options) {
+    const includeScreenshot = !options || options.includeScreenshot !== false;
     const selector = buildUniqueSelector(el);
     const rect = el.getBoundingClientRect();
-    const width = Math.round(rect.width);
-    const height = Math.round(rect.height);
-    const x = Math.round(rect.left);
-    const y = Math.round(rect.top);
-    const html = el.outerHTML || '';
-    const styles = collectCuratedStyles(el);
-    const text = extractFullVisibleText(el);
-
-    const parts = [];
-    parts.push('# DOMLens — Element snapshot');
-    parts.push('');
-    parts.push('## Selector');
-    parts.push(selector);
-    parts.push('');
-    parts.push('## Box');
-    parts.push(`width: ${width}px  height: ${height}px  x: ${x}  y: ${y}`);
-    parts.push('');
-    parts.push('## HTML');
-    parts.push(html);
-    parts.push('');
-    parts.push('## Computed styles');
-    parts.push(styles);
-    if (text) {
-      parts.push('');
-      parts.push('## Text');
-      parts.push(text);
+    const box = {
+      width: Math.round(rect.width),
+      height: Math.round(rect.height),
+      x: Math.round(rect.left),
+      y: Math.round(rect.top)
+    };
+    const meta = buildMeta();
+    const snapshot = {
+      selector,
+      box,
+      html: el.outerHTML || '',
+      text: extractFullVisibleText(el),
+      styles: globalThis.ComputedStylesDiff.buildTree(el),
+      assets: globalThis.AssetCollector.collect(el),
+      meta
+    };
+    if (includeScreenshot) {
+      const screenshot = await captureElementScreenshot(box, meta.devicePixelRatio);
+      if (screenshot) snapshot.screenshot = screenshot;
     }
-    return parts.join('\n');
+    return JSON.stringify(snapshot);
   }
 
   globalThis.ElementCopy = {

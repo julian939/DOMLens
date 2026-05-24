@@ -3,6 +3,7 @@
 
   const DEFAULT_HOTKEY = Object.freeze({ code: "AltLeft", key: "Alt" });
   const DEFAULT_ACTION_KEY = Object.freeze({ code: "KeyC", key: "c" });
+  const DEFAULT_SNAPSHOT_OPTIONS = Object.freeze({ includeScreenshot: true });
 
   const MODIFIER_KEYS = Object.freeze(["Alt", "Control", "Meta", "Shift"]);
 
@@ -30,6 +31,14 @@
     return out;
   }
 
+  function sanitizeSnapshot(raw) {
+    const source = (raw && typeof raw === "object") ? raw : {};
+    const includeScreenshot = typeof source.includeScreenshot === "boolean"
+      ? source.includeScreenshot
+      : DEFAULT_SNAPSHOT_OPTIONS.includeScreenshot;
+    return { includeScreenshot };
+  }
+
   function sanitizeKeyBinding(raw, defaultVal) {
     if (!raw || typeof raw !== "object" || typeof raw.code !== "string") {
       return { ...defaultVal };
@@ -45,7 +54,8 @@
     return {
       hotkey: sanitizeKeyBinding(input.hotkey, DEFAULT_HOTKEY),
       actionKey: sanitizeKeyBinding(input.actionKey, DEFAULT_ACTION_KEY),
-      infoFields: sanitizeInfoFields(input.infoFields)
+      infoFields: sanitizeInfoFields(input.infoFields),
+      snapshot: sanitizeSnapshot(input.snapshot)
     };
   }
 
@@ -53,7 +63,8 @@
     return Object.freeze({
       hotkey: { ...DEFAULT_HOTKEY },
       actionKey: { ...DEFAULT_ACTION_KEY },
-      infoFields: computeInfoFieldDefaults()
+      infoFields: computeInfoFieldDefaults(),
+      snapshot: { ...DEFAULT_SNAPSHOT_OPTIONS }
     });
   }
 
@@ -82,6 +93,7 @@
     MODIFIER_KEYS,
     DEFAULT_HOTKEY,
     DEFAULT_ACTION_KEY,
+    DEFAULT_SNAPSHOT_OPTIONS,
     get DEFAULTS() { return getDefaults(); },
     get INFO_FIELD_DEFAULTS() { return computeInfoFieldDefaults(); },
     load,

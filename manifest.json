@@ -1,24 +1,24 @@
 {
   "manifest_version": 3,
   "name": "DOMLens",
-  "version": "0.1.0",
-  "description": "Hold a hotkey and hover any element to see its tag, size, colors, and fonts. Press C to copy its CSS selector.",
+  "version": "0.4.1",
+  "description": "Hold a hotkey and hover any element to see its properties. Press the action key to copy a CSS selector snippet, or press it twice for a full snapshot.",
   "minimum_chrome_version": "88",
-  "permissions": ["storage", "clipboardWrite"],
+  "permissions": ["storage", "clipboardWrite", "tabs"],
   "host_permissions": ["<all_urls>"],
   "icons": {
-    "16": "icons/icon16.png",
-    "32": "icons/icon32.png",
-    "48": "icons/icon48.png",
-    "128": "icons/icon128.png"
+    "16": "assets/icons/icon16.png",
+    "32": "assets/icons/icon32.png",
+    "48": "assets/icons/icon48.png",
+    "128": "assets/icons/icon128.png"
   },
   "action": {
     "default_title": "DOMLens — open options to configure the hotkey",
     "default_icon": {
-      "16": "icons/icon16.png",
-      "32": "icons/icon32.png",
-      "48": "icons/icon48.png",
-      "128": "icons/icon128.png"
+      "16": "assets/icons/icon16.png",
+      "32": "assets/icons/icon32.png",
+      "48": "assets/icons/icon48.png",
+      "128": "assets/icons/icon128.png"
     }
   },
   "background": {
@@ -30,6 +30,9 @@
       "js": [
         "src/shared/settings.js",
         "src/shared/info-fields.js",
+        "src/shared/computed-styles.js",
+        "src/shared/asset-collector.js",
+        "src/shared/screenshot-crop.js",
         "src/shared/element-copy.js",
         "src/content/overlay.js",
         "src/content/content.js"

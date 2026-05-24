@@ -294,13 +294,31 @@
     globalThis.Overlay.showToast('Copied!', state.cursor);
   }
 
-  function onCopyAllShortcut(target) {
+  async function onCopyAllShortcut(target) {
     const el = target || state.target;
     if (!el) return;
-    const payload = globalThis.ElementCopy.buildSnapshot(el);
+    const includeScreenshot = !!(state.settings && state.settings.snapshot && state.settings.snapshot.includeScreenshot);
+    if (includeScreenshot) {
+      // Hide the overlay for one frame so the captured viewport PNG does not
+      // include DOMLens chrome (highlight layers, info panel, toast).
+      globalThis.Overlay.hide();
+      globalThis.Overlay.hideToast();
+      await nextFramePaint();
+    }
+    const payload = await globalThis.ElementCopy.buildSnapshot(el, { includeScreenshot });
     writeClipboard(payload);
+    if (includeScreenshot && state.active && state.target === el) {
+      // Re-render so highlight layers come back, then flash on top of them.
+      render();
+    }
     globalThis.Overlay.flash();
     globalThis.Overlay.showToast('All info copied!', state.cursor);
+  }
+
+  function nextFramePaint() {
+    return new Promise((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    });
   }
 
   function writeClipboard(text) {

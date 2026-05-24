@@ -29,8 +29,8 @@ The single-line, HTML-like representation of an element produced by a single Act
 _Avoid_: Quick copy, short copy
 
 **Element Snapshot**:
-The full Markdown document produced by a double Action Key press while inspecting — contains selector, box dimensions, outerHTML, computed styles, and visible text under labeled sections.
-_Avoid_: Full copy, dump, export
+The full JSON document produced by a double Action Key press while inspecting — contains everything an AI agent needs to visually reconstruct the element: selector, box dimensions, outerHTML, full computed styles (filtered against UA defaults, recursively for all descendants, including `::before` / `::after`), referenced asset metadata (fonts, image URLs, CSS custom properties), and a base64-encoded PNG screenshot of the element cropped from the visible tab.
+_Avoid_: Full copy, dump, export, Markdown snapshot
 
 ## Example dialogue
 
