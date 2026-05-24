@@ -1,56 +1,48 @@
 (() => {
   const STORAGE_KEY = "settings";
-
-  const INFO_FIELD_DEFAULTS = Object.freeze({
-    dimensions: true,
-    coordinates: true,
-    margin: false,
-    padding: false,
-    border: false,
-    borderRadius: false,
-    display: false,
-    positionType: false,
-    zIndex: false,
-    overflow: false,
-    opacity: false,
-    cursor: false,
-    color: true,
-    background: true,
-    boxShadow: false,
-    font: true,
-    fontSize: true,
-    fontWeight: true,
-    lineHeight: false,
-    letterSpacing: false,
-    textAlign: false
-  });
-
-  const DEFAULTS = Object.freeze({
-    modifiers: ["Alt"],
-    infoFields: INFO_FIELD_DEFAULTS
-  });
-
   const ALLOWED_MODIFIERS = ["Alt", "Control", "Meta", "Shift"];
+  const DEFAULT_MODIFIERS = ["Alt"];
+
+  let cachedInfoFieldDefaults = null;
+
+  function computeInfoFieldDefaults() {
+    if (cachedInfoFieldDefaults) return cachedInfoFieldDefaults;
+    const registry = (globalThis.InfoFields && globalThis.InfoFields.REGISTRY) || [];
+    const out = {};
+    for (const field of registry) {
+      out[field.id] = !!field.defaultEnabled;
+    }
+    cachedInfoFieldDefaults = Object.freeze(out);
+    return cachedInfoFieldDefaults;
+  }
 
   function sanitizeInfoFields(raw) {
+    const defaults = computeInfoFieldDefaults();
     const out = {};
     const source = (raw && typeof raw === "object") ? raw : {};
-    for (const key of Object.keys(INFO_FIELD_DEFAULTS)) {
+    for (const key of Object.keys(defaults)) {
       const value = source[key];
-      out[key] = typeof value === "boolean" ? value : INFO_FIELD_DEFAULTS[key];
+      out[key] = typeof value === "boolean" ? value : defaults[key];
     }
     return out;
   }
 
   function sanitize(raw) {
-    const merged = { ...DEFAULTS, ...(raw || {}) };
-    if (!Array.isArray(merged.modifiers)) {
-      merged.modifiers = [...DEFAULTS.modifiers];
-    } else {
-      merged.modifiers = merged.modifiers.filter((m) => ALLOWED_MODIFIERS.includes(m));
-    }
-    merged.infoFields = sanitizeInfoFields(merged.infoFields);
+    const input = raw || {};
+    const merged = {
+      modifiers: Array.isArray(input.modifiers)
+        ? input.modifiers.filter((m) => ALLOWED_MODIFIERS.includes(m))
+        : [...DEFAULT_MODIFIERS],
+      infoFields: sanitizeInfoFields(input.infoFields)
+    };
     return merged;
+  }
+
+  function getDefaults() {
+    return Object.freeze({
+      modifiers: [...DEFAULT_MODIFIERS],
+      infoFields: computeInfoFieldDefaults()
+    });
   }
 
   async function load() {
@@ -74,10 +66,10 @@
   }
 
   globalThis.InspectSettings = {
-    DEFAULTS,
-    INFO_FIELD_DEFAULTS,
     STORAGE_KEY,
     ALLOWED_MODIFIERS,
+    get DEFAULTS() { return getDefaults(); },
+    get INFO_FIELD_DEFAULTS() { return computeInfoFieldDefaults(); },
     load,
     save,
     onChange

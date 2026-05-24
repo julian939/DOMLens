@@ -60,69 +60,69 @@
   const REGISTRY = [
     // BOX
     {
-      id: "dimensions", group: "box", label: "Dimensions",
+      id: "dimensions", group: "box", label: "Dimensions", defaultEnabled: true,
       getValue: (el) => {
         const r = rect(el);
         return { kind: "text", text: `${Math.round(r.width)} x ${Math.round(r.height)} px` };
       }
     },
     {
-      id: "coordinates", group: "box", label: "Coordinates",
+      id: "coordinates", group: "box", label: "Coordinates", defaultEnabled: true,
       getValue: (el) => {
         const r = rect(el);
         return { kind: "text", text: `${Math.round(r.left)}, ${Math.round(r.top)}` };
       }
     },
     {
-      id: "margin", group: "box", label: "Margin",
+      id: "margin", group: "box", label: "Margin", defaultEnabled: false,
       getValue: (el, cs) => ({ kind: "text", text: marginValue(el, cs) })
     },
     {
-      id: "padding", group: "box", label: "Padding",
+      id: "padding", group: "box", label: "Padding", defaultEnabled: false,
       getValue: (el, cs) => ({ kind: "text", text: paddingValue(el, cs) })
     },
     {
-      id: "border", group: "box", label: "Border",
+      id: "border", group: "box", label: "Border", defaultEnabled: false,
       getValue: (el, cs) => ({ kind: "text", text: borderValue(el, cs) })
     },
     {
-      id: "borderRadius", group: "box", label: "Border-radius",
+      id: "borderRadius", group: "box", label: "Border-radius", defaultEnabled: false,
       getValue: (el, cs) => ({ kind: "text", text: borderRadiusValue(el, cs) })
     },
 
     // LAYOUT
     {
-      id: "display", group: "layout", label: "Display",
+      id: "display", group: "layout", label: "Display", defaultEnabled: false,
       getValue: (_el, cs) => ({ kind: "text", text: cs.display })
     },
     {
-      id: "positionType", group: "layout", label: "Position",
+      id: "positionType", group: "layout", label: "Position", defaultEnabled: false,
       getValue: (_el, cs) => ({ kind: "text", text: cs.position })
     },
     {
-      id: "zIndex", group: "layout", label: "Z-index",
+      id: "zIndex", group: "layout", label: "Z-index", defaultEnabled: false,
       getValue: (_el, cs) => ({ kind: "text", text: cs.zIndex })
     },
     {
-      id: "overflow", group: "layout", label: "Overflow",
+      id: "overflow", group: "layout", label: "Overflow", defaultEnabled: false,
       getValue: (_el, cs) => ({ kind: "text", text: cs.overflow })
     },
     {
-      id: "opacity", group: "layout", label: "Opacity",
+      id: "opacity", group: "layout", label: "Opacity", defaultEnabled: false,
       getValue: (_el, cs) => ({ kind: "text", text: cs.opacity })
     },
     {
-      id: "cursor", group: "layout", label: "Cursor",
+      id: "cursor", group: "layout", label: "Cursor", defaultEnabled: false,
       getValue: (_el, cs) => ({ kind: "text", text: cs.cursor })
     },
 
     // COLORS
     {
-      id: "color", group: "colors", label: "Color",
+      id: "color", group: "colors", label: "Color", defaultEnabled: true,
       getValue: (_el, cs) => ({ kind: "color", color: cs.color, text: cs.color })
     },
     {
-      id: "background", group: "colors", label: "Background",
+      id: "background", group: "colors", label: "Background", defaultEnabled: true,
       getValue: (_el, cs) => {
         const bg = cs.backgroundColor;
         if (isTransparent(bg)) return { kind: "text", text: "transparent" };
@@ -130,33 +130,33 @@
       }
     },
     {
-      id: "boxShadow", group: "colors", label: "Box-shadow",
+      id: "boxShadow", group: "colors", label: "Box-shadow", defaultEnabled: false,
       getValue: (_el, cs) => ({ kind: "text", text: cs.boxShadow })
     },
 
     // TYPOGRAPHY
     {
-      id: "font", group: "typography", label: "Font",
+      id: "font", group: "typography", label: "Font", defaultEnabled: true,
       getValue: (_el, cs) => ({ kind: "text", text: cleanFontFamily(cs.fontFamily) })
     },
     {
-      id: "fontSize", group: "typography", label: "Size",
+      id: "fontSize", group: "typography", label: "Size", defaultEnabled: true,
       getValue: (_el, cs) => ({ kind: "text", text: cs.fontSize })
     },
     {
-      id: "fontWeight", group: "typography", label: "Weight",
+      id: "fontWeight", group: "typography", label: "Weight", defaultEnabled: true,
       getValue: (_el, cs) => ({ kind: "text", text: cs.fontWeight })
     },
     {
-      id: "lineHeight", group: "typography", label: "Line-height",
+      id: "lineHeight", group: "typography", label: "Line-height", defaultEnabled: false,
       getValue: (_el, cs) => ({ kind: "text", text: cs.lineHeight })
     },
     {
-      id: "letterSpacing", group: "typography", label: "Letter-spacing",
+      id: "letterSpacing", group: "typography", label: "Letter-spacing", defaultEnabled: false,
       getValue: (_el, cs) => ({ kind: "text", text: cs.letterSpacing })
     },
     {
-      id: "textAlign", group: "typography", label: "Text-align",
+      id: "textAlign", group: "typography", label: "Text-align", defaultEnabled: false,
       getValue: (_el, cs) => ({ kind: "text", text: cs.textAlign })
     }
   ];
