@@ -50,8 +50,7 @@ web-ext-artifacts/
 .claude-code/
 .cursor/
 CLAUDE.md
+.scratch/
 
-# Internal project docs — not for public release
-conversation_summary.md
-# Original German concept/spec doc — remove this line if you want to ship it publicly
-inspect_overlay_konzept.md
+# Internal docs — not tracked in git
+docs/

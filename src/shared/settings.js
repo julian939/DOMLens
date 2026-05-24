@@ -1,10 +1,46 @@
 (() => {
   const STORAGE_KEY = "settings";
+
+  const INFO_FIELD_DEFAULTS = Object.freeze({
+    dimensions: true,
+    coordinates: true,
+    margin: false,
+    padding: false,
+    border: false,
+    borderRadius: false,
+    display: false,
+    positionType: false,
+    zIndex: false,
+    overflow: false,
+    opacity: false,
+    cursor: false,
+    color: true,
+    background: true,
+    boxShadow: false,
+    font: true,
+    fontSize: true,
+    fontWeight: true,
+    lineHeight: false,
+    letterSpacing: false,
+    textAlign: false
+  });
+
   const DEFAULTS = Object.freeze({
-    modifiers: ["Alt"]
+    modifiers: ["Alt"],
+    infoFields: INFO_FIELD_DEFAULTS
   });
 
   const ALLOWED_MODIFIERS = ["Alt", "Control", "Meta", "Shift"];
+
+  function sanitizeInfoFields(raw) {
+    const out = {};
+    const source = (raw && typeof raw === "object") ? raw : {};
+    for (const key of Object.keys(INFO_FIELD_DEFAULTS)) {
+      const value = source[key];
+      out[key] = typeof value === "boolean" ? value : INFO_FIELD_DEFAULTS[key];
+    }
+    return out;
+  }
 
   function sanitize(raw) {
     const merged = { ...DEFAULTS, ...(raw || {}) };
@@ -13,6 +49,7 @@
     } else {
       merged.modifiers = merged.modifiers.filter((m) => ALLOWED_MODIFIERS.includes(m));
     }
+    merged.infoFields = sanitizeInfoFields(merged.infoFields);
     return merged;
   }
 
@@ -38,6 +75,7 @@
 
   globalThis.InspectSettings = {
     DEFAULTS,
+    INFO_FIELD_DEFAULTS,
     STORAGE_KEY,
     ALLOWED_MODIFIERS,
     load,

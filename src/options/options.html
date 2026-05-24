@@ -54,9 +54,34 @@
 
         <div class="status" id="status">Loading…</div>
       </section>
+
+      <section class="card">
+        <h2>Info Panel fields</h2>
+        <p class="hint">
+          Choose which rows appear in the info panel. The selector row
+          (<code>tag#id.class</code>) is always shown. Groups with no enabled
+          fields are hidden entirely.
+        </p>
+
+        <div class="info-fields" id="info-fields"></div>
+      </section>
+
+      <section class="card reset-card">
+        <div class="reset-row">
+          <div>
+            <h2>Reset to defaults</h2>
+            <p class="hint">
+              Restores the default hotkey (<strong>Alt</strong>) and the original
+              seven info-panel fields. This cannot be undone.
+            </p>
+          </div>
+          <button type="button" class="btn-reset" id="reset-button">Reset</button>
+        </div>
+      </section>
     </main>
 
     <script src="../shared/settings.js"></script>
+    <script src="../shared/info-fields.js"></script>
     <script src="options.js"></script>
   </body>
 </html>

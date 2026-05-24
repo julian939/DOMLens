@@ -24,7 +24,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["src/shared/settings.js", "src/content/content.js"],
+      "js": ["src/shared/settings.js", "src/shared/info-fields.js", "src/content/content.js"],
       "run_at": "document_start",
       "all_frames": true,
       "world": "ISOLATED"

@@ -522,21 +522,7 @@
     const id = el.id ? `#${el.id}` : '';
     const classes = el.classList.length ? '.' + Array.from(el.classList).join('.') : '';
 
-    const rect = el.getBoundingClientRect();
-    const width = Math.round(rect.width);
-    const height = Math.round(rect.height);
-    const left = Math.round(rect.left);
-    const top = Math.round(rect.top);
-
-    const color = cs.color;
-    const bg = cs.backgroundColor;
-    const bgVisible = !isTransparent(bg);
-
-    const fontFamily = cleanFontFamily(cs.fontFamily);
-    const fontSize = cs.fontSize;
-    const fontWeight = cs.fontWeight;
-
-    panel.innerHTML = `
+    const selectorHtml = `
       <div class="selector">
         <span class="sel-tag">${escapeHtml(tag)}</span>${
           id ? `<span class="sel-id">${escapeHtml(id)}</span>` : ''
@@ -544,22 +530,55 @@
           classes ? `<span class="sel-class">${escapeHtml(classes)}</span>` : ''
         }
       </div>
-      <div class="row"><span class="label">Dimensions</span><span class="value">${width} x ${height} px</span></div>
-      <div class="row"><span class="label">Position</span><span class="value">${left}, ${top}</span></div>
-      <div class="group">
-        <div class="row"><span class="label">Color</span><span class="value">${
-          renderSwatch(color)
-        }${escapeHtml(color)}</span></div>
-        <div class="row"><span class="label">Background</span><span class="value">${
-          bgVisible ? renderSwatch(bg) + escapeHtml(bg) : 'transparent'
-        }</span></div>
-      </div>
-      <div class="group">
-        <div class="row"><span class="label">Font</span><span class="value">${escapeHtml(fontFamily)}</span></div>
-        <div class="row"><span class="label">Size</span><span class="value">${escapeHtml(fontSize)}</span></div>
-        <div class="row"><span class="label">Weight</span><span class="value">${escapeHtml(fontWeight)}</span></div>
-      </div>
     `;
+
+    const enabled = (state.settings && state.settings.infoFields) || {};
+    const registry = (globalThis.InfoFields && globalThis.InfoFields.REGISTRY) || [];
+    const groups = (globalThis.InfoFields && globalThis.InfoFields.GROUPS) || [];
+
+    const rowsByGroup = new Map();
+    for (const field of registry) {
+      if (!enabled[field.id]) continue;
+      const result = safeGetValue(field, el, cs);
+      if (!result) continue;
+      const rowHtml = renderFieldRow(field.label, result);
+      if (!rowHtml) continue;
+      if (!rowsByGroup.has(field.group)) rowsByGroup.set(field.group, []);
+      rowsByGroup.get(field.group).push(rowHtml);
+    }
+
+    let firstGroup = true;
+    let groupsHtml = '';
+    for (const group of groups) {
+      const rows = rowsByGroup.get(group.id);
+      if (!rows || !rows.length) continue;
+      const cls = firstGroup ? 'fields' : 'fields group';
+      groupsHtml += `<div class="${cls}">${rows.join('')}</div>`;
+      firstGroup = false;
+    }
+
+    panel.innerHTML = selectorHtml + groupsHtml;
+  }
+
+  function safeGetValue(field, el, cs) {
+    try {
+      return field.getValue(el, cs);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function renderFieldRow(label, value) {
+    if (!value) return '';
+    const text = value.text == null ? '' : String(value.text);
+    if (!text) return '';
+    let valueHtml;
+    if (value.kind === 'color') {
+      valueHtml = renderSwatch(value.color) + escapeHtml(text);
+    } else {
+      valueHtml = escapeHtml(text);
+    }
+    return `<div class="row"><span class="label">${escapeHtml(label)}</span><span class="value">${valueHtml}</span></div>`;
   }
 
   function positionPanel() {
