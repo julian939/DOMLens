@@ -1,64 +1,148 @@
+/* ══════════════════════════════════════════════════════
+   DOMLens — Medieval Retro Theme
+   Inspired by the golden magnifying-glass icon
+   ══════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=MedievalSharp&family=Crimson+Text:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+
 :root {
-  --bg: #f6f7f9;
-  --card: #ffffff;
-  --text: #1c1f23;
-  --subtle: #6b7280;
-  --border: #e2e5ea;
-  --accent: #2563eb;
-  --accent-soft: #dbeafe;
-  --warn: #b45309;
-  --warn-bg: #fff7ed;
+  /* Parchment palette */
+  --bg:           #2a1f14;
+  --bg-grain:     #342618;
+  --card:         #3d2e1f;
+  --card-hover:   #4a3828;
+  --text:         #e8dcc8;
+  --subtle:       #b8a68e;
+  --border:       #5c472f;
+  --border-light: #6e5639;
+
+  /* Gold accents — matching the icon rim */
+  --gold:         #c9a84c;
+  --gold-bright:  #e4c76b;
+  --gold-soft:    rgba(201, 168, 76, 0.15);
+  --gold-glow:    rgba(201, 168, 76, 0.25);
+
+  /* Warn / danger — deep red like royal seals */
+  --warn:         #c45a3a;
+  --warn-bg:      rgba(196, 90, 58, 0.1);
+  --warn-border:  rgba(196, 90, 58, 0.3);
+
+  /* Fonts */
+  --font-heading: 'MedievalSharp', cursive;
+  --font-body:    'Crimson Text', 'Georgia', serif;
+  --font-mono:    ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 * {
   box-sizing: border-box;
 }
 
+/* ── Page background with parchment grain ──────────── */
+
 html,
 body {
   margin: 0;
   padding: 0;
   background: var(--bg);
+  background-image:
+    radial-gradient(ellipse at 20% 50%, rgba(201, 168, 76, 0.04) 0%, transparent 70%),
+    radial-gradient(ellipse at 80% 20%, rgba(201, 168, 76, 0.03) 0%, transparent 60%);
   color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-  font-size: 14px;
-  line-height: 1.5;
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.65;
+  min-height: 100vh;
 }
 
 .container {
-  max-width: 620px;
+  max-width: 640px;
   margin: 0 auto;
-  padding: 40px 24px 80px;
+  padding: 48px 24px 96px;
+}
+
+/* ── Header ────────────────────────────────────────── */
+
+header {
+  text-align: center;
+  margin-bottom: 36px;
 }
 
 header h1 {
-  margin: 0 0 8px;
-  font-size: 22px;
-  font-weight: 600;
+  margin: 0 0 6px;
+  font-family: var(--font-heading);
+  font-size: 36px;
+  font-weight: 400;
+  color: var(--gold-bright);
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 24px rgba(201, 168, 76, 0.3),
+               0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+/* Decorative divider below title */
+header h1::after {
+  content: '⚜  ◆  ⚜';
+  display: block;
+  margin-top: 10px;
+  font-size: 14px;
+  letter-spacing: 0.3em;
+  color: var(--gold);
+  opacity: 0.5;
+  text-shadow: none;
 }
 
 .lead {
-  margin: 0 0 28px;
+  margin: 0;
   color: var(--subtle);
+  font-size: 14px;
+  line-height: 1.7;
+  max-width: 520px;
+  margin-left: auto;
+  margin-right: auto;
 }
+
+/* ── Cards ─────────────────────────────────────────── */
 
 .card {
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 20px 22px;
+  border-radius: 4px;
+  padding: 24px 26px;
+  position: relative;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25),
+              inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.card:hover {
+  border-color: var(--border-light);
+}
+
+/* Top gold ornament line on cards */
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 20px;
+  right: 20px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold) 30%, var(--gold) 70%, transparent);
+  opacity: 0.3;
 }
 
 .card h2 {
-  margin: 0 0 6px;
-  font-size: 15px;
-  font-weight: 600;
+  margin: 0 0 8px;
+  font-family: var(--font-heading);
+  font-size: 20px;
+  font-weight: 400;
+  color: var(--gold);
+  letter-spacing: 0.03em;
 }
 
 .hint {
-  margin: 0 0 16px;
+  margin: 0 0 18px;
   color: var(--subtle);
-  font-size: 13px;
+  font-size: 13.5px;
+  line-height: 1.6;
 }
 
 /* ── Key Recorder ──────────────────────────────────── */
@@ -68,59 +152,63 @@ header h1 {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 16px;
+  padding: 14px 18px;
   border: 2px solid var(--border);
-  border-radius: 10px;
+  border-radius: 4px;
   cursor: pointer;
-  background: #fff;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  background: var(--bg-grain);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
   outline: none;
   user-select: none;
 }
 
 .key-recorder:hover {
-  border-color: #c4cad3;
+  border-color: var(--border-light);
+  background: var(--card-hover);
 }
 
 .key-recorder:focus,
 .key-recorder.recording {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px var(--gold-soft),
+              0 0 16px rgba(201, 168, 76, 0.1);
 }
 
 .key-recorder.recording .recorder-label {
-  color: var(--accent);
-  font-weight: 500;
+  color: var(--gold-bright);
+  font-weight: 600;
 }
 
 .key-recorder.recording .recorder-key {
   opacity: 0.4;
-  animation: pulse-key 1s ease-in-out infinite;
+  animation: pulse-key 1.2s ease-in-out infinite;
 }
 
 .recorder-label {
-  font-size: 13px;
+  font-size: 13.5px;
   color: var(--subtle);
-  transition: color 0.15s ease;
+  transition: color 0.2s ease;
 }
 
 .recorder-key {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 14px;
   font-weight: 600;
-  color: var(--text);
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 4px 12px;
-  min-width: 40px;
+  color: var(--gold-bright);
+  background: rgba(201, 168, 76, 0.1);
+  border: 1px solid var(--gold);
+  border-radius: 4px;
+  padding: 5px 14px;
+  min-width: 44px;
   text-align: center;
-  transition: opacity 0.15s ease, background 0.15s ease;
+  transition: opacity 0.2s ease, background 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3),
+              inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 @keyframes pulse-key {
   0%, 100% { opacity: 0.4; }
-  50% { opacity: 0.15; }
+  50%      { opacity: 0.15; }
 }
 
 /* ── Status ────────────────────────────────────────── */
@@ -128,80 +216,96 @@ header h1 {
 .status {
   border-top: 1px solid var(--border);
   padding-top: 14px;
-  margin-top: 16px;
-  font-size: 13px;
+  margin-top: 18px;
+  font-size: 13.5px;
   color: var(--subtle);
 }
 
 .status strong {
-  color: var(--text);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--gold-bright);
+  font-family: var(--font-mono);
 }
 
 .status.warn {
   color: var(--warn);
   background: var(--warn-bg);
-  border-radius: 6px;
-  padding: 10px 12px;
-  border: 1px solid #fde4cf;
-  border-top-color: #fde4cf;
+  border-radius: 4px;
+  padding: 10px 14px;
+  border: 1px solid var(--warn-border);
+  border-top-color: var(--warn-border);
 }
 
 .container > .card + .card {
-  margin-top: 20px;
+  margin-top: 22px;
 }
 
 /* ── Info Fields ───────────────────────────────────── */
 
 .hint code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
-  background: #f1f3f6;
-  padding: 1px 5px;
-  border-radius: 4px;
+  background: rgba(201, 168, 76, 0.1);
+  color: var(--gold-bright);
+  padding: 2px 6px;
+  border-radius: 3px;
+  border: 1px solid rgba(201, 168, 76, 0.2);
 }
 
 .info-fields {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 20px;
 }
 
 .field-group h3 {
-  margin: 0 0 8px;
-  font-size: 12px;
-  font-weight: 600;
+  margin: 0 0 10px;
+  font-family: var(--font-heading);
+  font-size: 13px;
+  font-weight: 400;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--subtle);
+  letter-spacing: 0.12em;
+  color: var(--gold);
+  opacity: 0.7;
+}
+
+/* Small decorative line under group headings */
+.field-group h3::after {
+  content: '';
+  display: block;
+  margin-top: 6px;
+  width: 40px;
+  height: 1px;
+  background: var(--gold);
+  opacity: 0.3;
 }
 
 .field-list {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px 16px;
+  gap: 8px 14px;
 }
 
 .field {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
+  gap: 10px;
+  padding: 9px 14px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 4px;
   cursor: pointer;
-  background: #fff;
-  transition: border-color 0.12s ease, background 0.12s ease;
-  font-size: 13px;
+  background: var(--bg-grain);
+  transition: border-color 0.15s ease, background 0.15s ease;
+  font-size: 13.5px;
 }
 
 .field:hover {
-  border-color: #c4cad3;
+  border-color: var(--border-light);
+  background: var(--card-hover);
 }
 
 .field input[type="checkbox"] {
   margin: 0;
-  accent-color: var(--accent);
+  accent-color: var(--gold);
   width: 16px;
   height: 16px;
 }
@@ -225,23 +329,52 @@ header h1 {
 
 .btn-reset {
   flex-shrink: 0;
-  font: inherit;
-  font-weight: 600;
-  font-size: 13px;
+  font-family: var(--font-heading);
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: 0.03em;
   color: var(--warn);
-  background: #fff;
-  border: 1px solid #fde4cf;
-  border-radius: 8px;
-  padding: 8px 16px;
+  background: var(--bg-grain);
+  border: 1px solid var(--warn-border);
+  border-radius: 4px;
+  padding: 9px 20px;
   cursor: pointer;
-  transition: background 0.12s ease, border-color 0.12s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .btn-reset:hover {
   background: var(--warn-bg);
-  border-color: #f6cfa1;
+  border-color: var(--warn);
+  color: #e06b4a;
+  box-shadow: 0 0 12px rgba(196, 90, 58, 0.15);
 }
 
 .btn-reset:active {
-  background: #fdecd6;
+  background: rgba(196, 90, 58, 0.15);
+}
+
+/* ── Scrollbar ─────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-light);
+}
+
+/* ── Selection ─────────────────────────────────────── */
+
+::selection {
+  background: var(--gold-soft);
+  color: var(--gold-bright);
 }
