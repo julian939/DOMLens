@@ -2,7 +2,8 @@
   "manifest_version": 3,
   "name": "DOMLens",
   "version": "0.1.0",
-  "description": "Hold the configured hotkey and hover over elements to inspect their tag, classes, dimensions, position, colors, and typography. Press C to copy a unique CSS selector, or press C twice to copy a full element snapshot (HTML, box, computed styles, text) to the clipboard.",
+  "description": "Hold a hotkey and hover any element to see its tag, size, colors, and fonts. Press C to copy its CSS selector.",
+  "minimum_chrome_version": "88",
   "permissions": ["storage", "clipboardWrite"],
   "host_permissions": ["<all_urls>"],
   "icons": {
@@ -10,6 +11,15 @@
     "32": "icons/icon32.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "DOMLens — open options to configure the hotkey",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
   },
   "content_scripts": [
     {

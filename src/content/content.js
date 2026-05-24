@@ -23,6 +23,71 @@
   const COPY_TEXT_MAX_LEN = 60;
   const DOUBLE_TAP_WINDOW_MS = 250;
 
+  const SNIPPET_TEXT_MAX_LEN = 120;
+  const SNIPPET_PARENT_MAX_DEPTH = 3;
+  const SNIPPET_HREF_MAX_LEN = 40;
+  const VOID_ELEMENT_TAGS = new Set([
+    'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
+    'link', 'meta', 'param', 'source', 'track', 'wbr'
+  ]);
+
+  const SNIPPET_PRIORITY_ATTRS = [
+    'id',
+    'data-testid', 'data-test-id', 'data-test', 'data-cy', 'data-component',
+    'role',
+    'aria-label',
+    'name',
+    'type',
+    'alt',
+    'placeholder',
+    'href'
+  ];
+
+  const UTILITY_CLASS_PREFIXES = [
+    'text-', 'bg-', 'border-', 'rounded-', 'shadow-', 'ring-', 'opacity-',
+    'p-', 'px-', 'py-', 'pt-', 'pb-', 'pl-', 'pr-', 'ps-', 'pe-',
+    'm-', 'mx-', 'my-', 'mt-', 'mb-', 'ml-', 'mr-', 'ms-', 'me-',
+    'w-', 'h-', 'min-w-', 'min-h-', 'max-w-', 'max-h-', 'size-',
+    'gap-', 'gap-x-', 'gap-y-', 'space-x-', 'space-y-',
+    'items-', 'justify-', 'self-', 'place-', 'content-',
+    'top-', 'bottom-', 'left-', 'right-', 'inset-', 'z-',
+    'cursor-', 'select-', 'pointer-', 'overflow-', 'whitespace-',
+    'duration-', 'ease-', 'animate-', 'delay-',
+    'translate-', 'rotate-', 'scale-', 'skew-', 'origin-',
+    'font-', 'tracking-', 'leading-', 'line-clamp-', 'list-',
+    'fill-', 'stroke-', 'aspect-',
+    'col-', 'row-', 'order-', 'divide-',
+    'grid-cols-', 'grid-rows-', 'auto-cols-', 'auto-rows-', 'auto-flow-',
+    'basis-', 'grow-', 'shrink-', 'flex-',
+    'object-', 'isolate-', 'mix-blend-', 'bg-blend-',
+    'backdrop-', 'filter-', 'blur-', 'brightness-', 'contrast-',
+    'transition-', 'transform-'
+  ];
+
+  const UTILITY_CLASS_KEYWORDS = new Set([
+    'flex', 'grid', 'hidden', 'block', 'inline', 'inline-block',
+    'inline-flex', 'inline-grid', 'table', 'table-row', 'table-cell',
+    'absolute', 'relative', 'fixed', 'sticky', 'static',
+    'transition', 'transform', 'transform-gpu',
+    'truncate', 'uppercase', 'lowercase', 'capitalize', 'italic',
+    'underline', 'line-through', 'no-underline',
+    'overflow-hidden', 'overflow-visible', 'overflow-auto', 'overflow-scroll',
+    'sr-only', 'not-sr-only',
+    'rounded', 'border', 'shadow', 'ring',
+    'antialiased', 'subpixel-antialiased',
+    'visible', 'invisible', 'collapse',
+    'isolate', 'group', 'peer',
+    'container'
+  ]);
+
+  const HASH_CLASS_PATTERNS = [
+    /^css-[a-z0-9]+$/i,
+    /^sc-[a-zA-Z0-9]+$/,
+    /^_[A-Za-z0-9_-]{4,}$/,
+    /^[a-z][a-zA-Z0-9]*__[A-Za-z0-9_-]+--[A-Za-z0-9]+$/,
+    /[a-f0-9]{6,}/i
+  ];
+
   const CURATED_STYLE_PROPS = [
     'display', 'position', 'top', 'right', 'bottom', 'left',
     'width', 'height', 'min-width', 'min-height', 'max-width', 'max-height',
@@ -528,9 +593,7 @@
   function onCopyShortcut(target) {
     const el = target || state.target;
     if (!el) return;
-    const selector = buildUniqueSelector(el);
-    const text = extractVisibleText(el);
-    const line = text ? `${selector}  «${text}»` : selector;
+    const line = buildElementSnippet(el);
     writeClipboard(line);
     triggerFlash();
     showToast('Copied!');
@@ -805,6 +868,129 @@
     const lastSpace = slice.lastIndexOf(' ');
     const cut = lastSpace > COPY_TEXT_MAX_LEN * 0.6 ? slice.slice(0, lastSpace) : slice;
     return cut.replace(/[\s…]+$/, '') + '…';
+  }
+
+  function truncateAtWordBoundary(text, maxLen) {
+    if (!text) return '';
+    if (text.length <= maxLen) return text;
+    const slice = text.slice(0, maxLen);
+    const lastSpace = slice.lastIndexOf(' ');
+    const cut = lastSpace > maxLen * 0.6 ? slice.slice(0, lastSpace) : slice;
+    return cut.replace(/[\s…]+$/, '') + '…';
+  }
+
+  function isSemanticClass(name) {
+    if (!name) return false;
+    if (name.includes('[') || name.includes(':') || name.includes('/')) return false;
+    if (UTILITY_CLASS_KEYWORDS.has(name)) return false;
+    for (const prefix of UTILITY_CLASS_PREFIXES) {
+      if (name.startsWith(prefix)) return false;
+    }
+    for (const pattern of HASH_CLASS_PATTERNS) {
+      if (pattern.test(name)) return false;
+    }
+    return true;
+  }
+
+  function filterSemanticClasses(classList) {
+    const out = [];
+    for (const name of classList) {
+      if (isSemanticClass(name)) out.push(name);
+    }
+    return out;
+  }
+
+  function getElementOwnText(el) {
+    let out = '';
+    for (const node of el.childNodes) {
+      if (node.nodeType === 3) out += node.nodeValue;
+    }
+    return out.replace(/\s+/g, ' ').trim();
+  }
+
+  function getSnippetText(el) {
+    const own = getElementOwnText(el);
+    if (own) return truncateAtWordBoundary(own, SNIPPET_TEXT_MAX_LEN);
+    const full = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
+    return truncateAtWordBoundary(full, SNIPPET_TEXT_MAX_LEN);
+  }
+
+  function collectSnippetAttrs(el) {
+    const pairs = [];
+    for (const name of SNIPPET_PRIORITY_ATTRS) {
+      if (!el.hasAttribute(name)) continue;
+      let value = el.getAttribute(name) || '';
+      if (name === 'href' && value.length > SNIPPET_HREF_MAX_LEN) {
+        value = value.slice(0, SNIPPET_HREF_MAX_LEN - 1) + '…';
+      }
+      pairs.push([name, value]);
+    }
+    const classes = el.classList && el.classList.length
+      ? filterSemanticClasses(Array.from(el.classList))
+      : [];
+    if (classes.length) pairs.push(['class', classes.join(' ')]);
+    return pairs;
+  }
+
+  function shortAncestorSelector(node) {
+    if (!node || node.nodeType !== 1) return '';
+    const tag = node.tagName.toLowerCase();
+    if (node.id) return `${tag}#${node.id}`;
+    const testid = node.getAttribute && node.getAttribute('data-testid');
+    if (testid) return `${tag}[data-testid="${testid}"]`;
+    if (node.classList && node.classList.length) {
+      const semantic = filterSemanticClasses(Array.from(node.classList));
+      if (semantic.length) return `${tag}.${semantic[0]}`;
+    }
+    return tag;
+  }
+
+  function buildParentBreadcrumb(el) {
+    const segments = [];
+    let node = el.parentElement;
+    let depth = 0;
+    while (node && node.nodeType === 1 && depth < SNIPPET_PARENT_MAX_DEPTH) {
+      if (node === document.documentElement || node === document.body) break;
+      const seg = shortAncestorSelector(node);
+      segments.unshift(seg);
+      const hasAnchor = node.id
+        || (node.getAttribute && node.getAttribute('data-testid'))
+        || (node.classList && filterSemanticClasses(Array.from(node.classList)).length > 0);
+      if (hasAnchor) break;
+      node = node.parentElement;
+      depth++;
+    }
+    if (!segments.length) return '';
+    return segments.join(' > ');
+  }
+
+  function buildElementSnippet(el) {
+    if (!el || el.nodeType !== 1) return '';
+    if (el === document.documentElement) return '<html>';
+    if (el === document.body) return '<body>';
+
+    const tag = el.tagName.toLowerCase();
+    const attrs = collectSnippetAttrs(el);
+    const attrStr = attrs.map(([k, v]) => ` ${k}="${escapeHtml(v)}"`).join('');
+    const isVoid = VOID_ELEMENT_TAGS.has(tag);
+    const text = isVoid ? '' : getSnippetText(el);
+
+    let snippet;
+    if (isVoid) {
+      snippet = `<${tag}${attrStr} />`;
+    } else {
+      snippet = `<${tag}${attrStr}>${escapeHtml(text)}</${tag}>`;
+    }
+
+    const hasIdentifier = attrs.some(([k]) => k === 'id'
+      || k === 'aria-label'
+      || k.startsWith('data-'));
+    const textIsMeaningful = text && text.length > 2;
+    if (!hasIdentifier && !textIsMeaningful) {
+      const breadcrumb = buildParentBreadcrumb(el);
+      if (breadcrumb) snippet += `  ← in ${breadcrumb}`;
+    }
+    return snippet;
   }
 
   function isTransparent(value) {
