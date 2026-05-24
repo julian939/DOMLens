@@ -1,7 +1,10 @@
 (() => {
   const STORAGE_KEY = "settings";
-  const ALLOWED_MODIFIERS = ["Alt", "Control", "Meta", "Shift"];
-  const DEFAULT_MODIFIERS = ["Alt"];
+
+  const DEFAULT_HOTKEY = Object.freeze({ code: "AltLeft", key: "Alt" });
+  const DEFAULT_ACTION_KEY = Object.freeze({ code: "KeyC", key: "c" });
+
+  const MODIFIER_KEYS = Object.freeze(["Alt", "Control", "Meta", "Shift"]);
 
   let cachedInfoFieldDefaults = null;
 
@@ -27,20 +30,29 @@
     return out;
   }
 
+  function sanitizeKeyBinding(raw, defaultVal) {
+    if (!raw || typeof raw !== "object" || typeof raw.code !== "string") {
+      return { ...defaultVal };
+    }
+    return {
+      code: raw.code,
+      key: typeof raw.key === "string" ? raw.key : raw.code
+    };
+  }
+
   function sanitize(raw) {
     const input = raw || {};
-    const merged = {
-      modifiers: Array.isArray(input.modifiers)
-        ? input.modifiers.filter((m) => ALLOWED_MODIFIERS.includes(m))
-        : [...DEFAULT_MODIFIERS],
+    return {
+      hotkey: sanitizeKeyBinding(input.hotkey, DEFAULT_HOTKEY),
+      actionKey: sanitizeKeyBinding(input.actionKey, DEFAULT_ACTION_KEY),
       infoFields: sanitizeInfoFields(input.infoFields)
     };
-    return merged;
   }
 
   function getDefaults() {
     return Object.freeze({
-      modifiers: [...DEFAULT_MODIFIERS],
+      hotkey: { ...DEFAULT_HOTKEY },
+      actionKey: { ...DEFAULT_ACTION_KEY },
       infoFields: computeInfoFieldDefaults()
     });
   }
@@ -67,7 +79,9 @@
 
   globalThis.InspectSettings = {
     STORAGE_KEY,
-    ALLOWED_MODIFIERS,
+    MODIFIER_KEYS,
+    DEFAULT_HOTKEY,
+    DEFAULT_ACTION_KEY,
     get DEFAULTS() { return getDefaults(); },
     get INFO_FIELD_DEFAULTS() { return computeInfoFieldDefaults(); },
     load,

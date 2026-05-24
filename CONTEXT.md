@@ -1,12 +1,16 @@
 # DOMLens
 
-A Chrome extension that lets users hold a hotkey and hover any element on a webpage to see its tag, dimensions, colors, and fonts. Pressing C while the hotkey is held copies element details to the clipboard.
+A Chrome extension that lets users hold a hotkey and hover any element on a webpage to see its tag, dimensions, colors, and fonts. Pressing the Action Key while the hotkey is held copies element details to the clipboard.
 
 ## Language
 
 **Inspect Mode**:
 The active state entered while the [[hotkey]] is held — the extension tracks the element under the cursor, draws [[highlight-layers]], and shows the [[info-panel]]. Exits immediately on hotkey release, tab switch, or window blur.
 _Avoid_: Peek mode, hover mode, inspection state
+
+**Action Key**:
+The key pressed in combination with the [[hotkey]] while in [[inspect-mode]] to capture the current element. A single press produces an [[element-snippet]]; a double press produces an [[element-snapshot]].
+_Avoid_: Capture key, trigger key, copy key
 
 **Info Panel**:
 The floating, read-only overlay that appears next to the cursor while inspecting, showing the element's selector followed by the user's enabled [[info-fields]]. Non-interactive (`pointer-events: none`).
@@ -21,11 +25,11 @@ The four semi-transparent overlays drawn over the hovered element while in [[ins
 _Avoid_: Box model overlay, highlight, outline
 
 **Element Snippet**:
-The single-line, HTML-like representation of an element produced by a single C press while inspecting — includes the tag, curated attributes (id, data-testid, aria-label, etc.), and optionally a parent breadcrumb. Optimized for pasting into a chat or prompt.
+The single-line, HTML-like representation of an element produced by a single Action Key press while inspecting — includes the tag, curated attributes (id, data-testid, aria-label, etc.), and optionally a parent breadcrumb. Optimized for pasting into a chat or prompt.
 _Avoid_: Quick copy, short copy
 
 **Element Snapshot**:
-The full Markdown document produced by a double C press while inspecting — contains selector, box dimensions, outerHTML, computed styles, and visible text under labeled sections.
+The full Markdown document produced by a double Action Key press while inspecting — contains selector, box dimensions, outerHTML, computed styles, and visible text under labeled sections.
 _Avoid_: Full copy, dump, export
 
 ## Example dialogue
@@ -38,7 +42,7 @@ _Avoid_: Full copy, dump, export
 >
 > **Dev B:** So the measurements are correct, only the four overlay rectangles draw at the wrong coordinates. That points at the box-model rect calculation, not the inspection logic.
 >
-> **Dev A:** Right. And here's the weird part — when they press C to grab an Element Snippet, the copied selector matches the element they actually intended to hover, not the one under the misaligned layers.
+> **Dev A:** Right. And here's the weird part — when they press the Action Key to grab an Element Snippet, the copied selector matches the element they actually intended to hover, not the one under the misaligned layers.
 >
 > **Dev B:** That confirms it. The hover target is right; only the visual layer is offset. Does the double-press Element Snapshot have the same selector?
 >

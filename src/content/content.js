@@ -21,6 +21,9 @@
     pendingCopyTarget: null
   };
 
+  /* Track pressed non-modifier keys so we can detect "is hotkey held" */
+  const pressedKeys = new Set();
+
   function init() {
     globalThis.Overlay.init();
     attachWindowLifecycle();
@@ -36,14 +39,20 @@
 
   function applySettings(settings) {
     state.settings = settings;
-    state.enabled = settings.modifiers.length > 0;
+    state.enabled = !!(settings.hotkey && settings.hotkey.code);
     if (!state.enabled) deactivate();
   }
 
   function attachWindowLifecycle() {
-    window.addEventListener('blur', deactivate);
+    window.addEventListener('blur', () => {
+      pressedKeys.clear();
+      deactivate();
+    });
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden) deactivate();
+      if (document.hidden) {
+        pressedKeys.clear();
+        deactivate();
+      }
     });
   }
 
@@ -52,16 +61,36 @@
     window.addEventListener('keyup', onKeyUp, { capture: true, passive: true });
   }
 
-  function modifiersHeld(event) {
-    if (!state.settings || !state.settings.modifiers.length) return false;
-    return state.settings.modifiers.every((mod) => MODIFIER_EVENT_MAP[mod]?.(event));
+  function isModifierKey(key) {
+    return key in MODIFIER_EVENT_MAP;
+  }
+
+  function hotkeyHeld(event) {
+    if (!state.settings || !state.settings.hotkey) return false;
+    const hotkey = state.settings.hotkey;
+
+    // If the hotkey is a modifier key, use the event flags
+    if (isModifierKey(hotkey.key)) {
+      return MODIFIER_EVENT_MAP[hotkey.key](event);
+    }
+
+    // Otherwise check our tracked set
+    return pressedKeys.has(hotkey.code);
   }
 
   function onKeyDown(event) {
     if (!state.enabled) return;
-    if (modifiersHeld(event)) {
+
+    // Track all non-modifier keys
+    if (!isModifierKey(event.key)) {
+      pressedKeys.add(event.code);
+    }
+
+    if (hotkeyHeld(event)) {
       activate();
-      if (state.active && event.code === 'KeyC' && !event.repeat) {
+
+      const actionCode = state.settings.actionKey && state.settings.actionKey.code;
+      if (state.active && actionCode && event.code === actionCode && !event.repeat) {
         event.preventDefault();
         event.stopPropagation();
         onCopyKey();
@@ -99,8 +128,13 @@
   }
 
   function onKeyUp(event) {
+    // Un-track released keys
+    if (!isModifierKey(event.key)) {
+      pressedKeys.delete(event.code);
+    }
+
     if (!state.active) return;
-    if (!modifiersHeld(event)) deactivate();
+    if (!hotkeyHeld(event)) deactivate();
   }
 
   function activate() {

@@ -10,14 +10,14 @@
     <main class="container">
       <header>
         <h1>DOMLens</h1>
-        <p class="lead">
+        <p class="lead" id="lead-text">
           Hold the configured hotkey and move your mouse over elements.
           The hovered element is highlighted and an info panel shows the tag,
           classes, dimensions, position, colors, and typography. Releasing the hotkey hides everything.
-          Press <strong>C</strong> while holding the hotkey to copy a unique CSS selector
+          Press the action key while holding the hotkey to copy a unique CSS selector
           (plus any visible text) to the clipboard —
           the highlight briefly flashes green to confirm.
-          Press <strong>C twice</strong> in quick succession to copy a full snapshot of the element
+          Press the action key twice in quick succession to copy a full snapshot of the element
           (HTML, box, computed styles, and text).
         </p>
       </header>
@@ -25,34 +25,29 @@
       <section class="card">
         <h2>Hotkey</h2>
         <p class="hint">
-          Select one or more modifier keys. All selected keys must be held
-          <em>simultaneously</em> to activate inspect mode.
+          The key you hold down to activate inspect mode.
+          Click the recorder below and press any key.
         </p>
 
-        <fieldset class="modifiers">
-          <label>
-            <input type="checkbox" data-modifier="Alt" />
-            <span class="key">Alt</span>
-            <span class="subtle" data-platform-label="Alt"></span>
-          </label>
-          <label>
-            <input type="checkbox" data-modifier="Control" />
-            <span class="key">Control</span>
-            <span class="subtle">(Ctrl)</span>
-          </label>
-          <label>
-            <input type="checkbox" data-modifier="Meta" />
-            <span class="key">Meta</span>
-            <span class="subtle" data-platform-label="Meta"></span>
-          </label>
-          <label>
-            <input type="checkbox" data-modifier="Shift" />
-            <span class="key">Shift</span>
-            <span class="subtle">(Shift key)</span>
-          </label>
-        </fieldset>
+        <div class="key-recorder" id="hotkey-recorder" tabindex="0">
+          <span class="recorder-label">Press a key…</span>
+          <span class="recorder-key" id="hotkey-display"></span>
+        </div>
 
         <div class="status" id="status">Loading…</div>
+      </section>
+
+      <section class="card">
+        <h2>Action Key</h2>
+        <p class="hint">
+          The key you press (while holding the hotkey) to capture the current element.
+          Single press = element snippet, double press = full snapshot.
+        </p>
+
+        <div class="key-recorder" id="action-key-recorder" tabindex="0">
+          <span class="recorder-label">Press a key…</span>
+          <span class="recorder-key" id="action-key-display"></span>
+        </div>
       </section>
 
       <section class="card">
@@ -71,8 +66,9 @@
           <div>
             <h2>Reset to defaults</h2>
             <p class="hint">
-              Restores the default hotkey (<strong>Alt</strong>) and the original
-              seven info-panel fields. This cannot be undone.
+              Restores the default hotkey (<strong>Alt</strong>), action key
+              (<strong>C</strong>), and the original info-panel fields.
+              This cannot be undone.
             </p>
           </div>
           <button type="button" class="btn-reset" id="reset-button">Reset</button>
