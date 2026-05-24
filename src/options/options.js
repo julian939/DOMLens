@@ -192,20 +192,20 @@
     const hotkeyLabel = shortKeyLabel(settings.hotkey);
     const actionLabel = shortKeyLabel(settings.actionKey);
     statusEl.classList.remove('warn');
-    statusEl.innerHTML = `Active: Hold <strong>${escapeHtml(hotkeyLabel)}</strong>, press <strong>${escapeHtml(actionLabel)}</strong> to capture.`;
+    statusEl.innerHTML = `Active: Hold <strong>${escapeHtml(hotkeyLabel)}</strong> to inspect, press the Action Key (<strong>${escapeHtml(actionLabel)}</strong>) to capture.`;
   }
 
   function renderLead(settings) {
     const hk = shortKeyLabel(settings.hotkey);
     const ak = shortKeyLabel(settings.actionKey);
     leadText.innerHTML =
-      `Hold the configured hotkey and move your mouse over elements. ` +
+      `Hold the hotkey (<strong>${escapeHtml(hk)}</strong>) and move your mouse over elements to enter Inspect Mode. ` +
       `The hovered element is highlighted and an info panel shows the tag, ` +
-      `classes, dimensions, position, colors, and typography. Releasing the hotkey hides everything. ` +
-      `Press <strong>${escapeHtml(ak)}</strong> while holding <strong>${escapeHtml(hk)}</strong> to copy a unique CSS selector ` +
-      `(plus any visible text) to the clipboard — ` +
+      `classes, dimensions, position, colors, and typography. Releasing the hotkey exits Inspect Mode. ` +
+      `Press the Action Key (<strong>${escapeHtml(ak)}</strong>) while holding the hotkey to copy an element snippet ` +
+      `(a unique CSS selector plus any visible text) to the clipboard — ` +
       `the highlight briefly flashes green to confirm. ` +
-      `Press <strong>${escapeHtml(ak)}</strong> twice in quick succession to copy a full snapshot of the element ` +
+      `Press the Action Key twice in quick succession to copy a full element snapshot ` +
       `(HTML, box, computed styles, and text).`;
   }
 
