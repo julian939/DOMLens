@@ -20,8 +20,15 @@
   let layers = null;
   let panel = null;
   let toast = null;
+  let progressBar = null;
   let flashTimeoutId = 0;
   let toastTimeoutId = 0;
+
+  /* Locked-target mode keeps Highlight Layers glued to a single element via
+     RAF, decoupled from cursor-driven elementFromPoint tracking. */
+  let lockedTarget = null;
+  let lockedCs = null;
+  let lockedRafId = 0;
 
   function createLayer(cls) {
     const el = document.createElement('div');
@@ -50,6 +57,10 @@
     style.textContent = `
       .layer {
         all: initial;
+        /* all: initial resets visibility to its initial value (visible),
+           overriding host visibility inheritance. Re-opt-in to inherit so
+           Overlay.hide() actually hides painted layers. */
+        visibility: inherit;
         position: fixed;
         pointer-events: none;
         display: none;
@@ -82,6 +93,7 @@
       }
       .panel {
         all: initial;
+        visibility: inherit;
         position: fixed;
         pointer-events: none;
         display: none;
@@ -96,7 +108,20 @@
         padding: 10px 12px;
         border-radius: 6px;
         box-shadow: 0 6px 24px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.4);
+        overflow: hidden;
       }
+      .hold-progress {
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 3px;
+        width: 0;
+        background: ${HIGHLIGHT_COLORS.outline};
+        pointer-events: none;
+        display: none;
+        will-change: width;
+      }
+      .hold-progress.active { display: block; }
       .panel * { box-sizing: border-box; }
       .selector {
         font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -138,6 +163,7 @@
       }
       .toast {
         all: initial;
+        visibility: inherit;
         position: fixed;
         pointer-events: none;
         display: none;
@@ -175,6 +201,9 @@
 
     panel = document.createElement('div');
     panel.className = 'panel';
+    progressBar = document.createElement('div');
+    progressBar.className = 'hold-progress';
+    panel.appendChild(progressBar);
     shadow.appendChild(panel);
 
     toast = document.createElement('div');
@@ -296,12 +325,69 @@
   function showFor(el, cursor, panelHtml, cs) {
     renderHighlight(el, cs);
     showPanel(panelHtml, cursor);
+    show();
   }
 
+  /* Hide/show via the shadow-host's visibility so the layout tree stays put.
+     This lets the capture path collapse its two-RAF defensive wait to a
+     single paint frame: visibility flips do not invalidate layout. */
   function hide() {
-    if (!layers) return;
-    Object.values(layers).forEach((el) => (el.style.display = 'none'));
-    if (panel) panel.style.display = 'none';
+    if (!host) return;
+    host.style.visibility = 'hidden';
+  }
+
+  function show() {
+    if (!host) return;
+    host.style.visibility = 'visible';
+  }
+
+  function enterLockedTargetMode(el) {
+    if (!el) return;
+    lockedTarget = el;
+    try {
+      lockedCs = getComputedStyle(el);
+    } catch (_) {
+      lockedCs = null;
+    }
+    show();
+    if (lockedRafId) cancelAnimationFrame(lockedRafId);
+    scheduleLockedFrame();
+  }
+
+  function exitLockedTargetMode() {
+    lockedTarget = null;
+    lockedCs = null;
+    if (lockedRafId) {
+      cancelAnimationFrame(lockedRafId);
+      lockedRafId = 0;
+    }
+  }
+
+  function scheduleLockedFrame() {
+    lockedRafId = requestAnimationFrame(() => {
+      lockedRafId = 0;
+      if (!lockedTarget || !lockedCs) return;
+      try {
+        renderHighlight(lockedTarget, lockedCs);
+      } catch (_) {
+        /* If the locked element has been detached, exit cleanly. */
+        exitLockedTargetMode();
+        return;
+      }
+      scheduleLockedFrame();
+    });
+  }
+
+  function setHoldProgress(fraction) {
+    if (!progressBar) return;
+    if (fraction == null || fraction <= 0) {
+      progressBar.classList.remove('active');
+      progressBar.style.width = '0';
+      return;
+    }
+    const clamped = fraction >= 1 ? 1 : fraction;
+    progressBar.classList.add('active');
+    progressBar.style.width = `${(clamped * 100).toFixed(2)}%`;
   }
 
   function flash() {
@@ -366,9 +452,13 @@
     isOwnNode,
     showFor,
     hide,
+    show,
     flash,
     clearFlash,
     showToast,
-    hideToast
+    hideToast,
+    enterLockedTargetMode,
+    exitLockedTargetMode,
+    setHoldProgress
   };
 })();

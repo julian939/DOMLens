@@ -6,8 +6,6 @@
     Shift: (e) => e.shiftKey
   };
 
-  const DOUBLE_TAP_WINDOW_MS = 250;
-
   const state = {
     settings: null,
     enabled: false,
@@ -17,8 +15,11 @@
     cachedStyle: null,
     rafScheduled: false,
     listenersAttached: false,
-    pendingCopyTimeoutId: 0,
-    pendingCopyTarget: null
+    /* Gesture state — populated at actionKeyDown, cleared on any terminal. */
+    dispatcher: null,
+    holdTarget: null,
+    preCompute: null,
+    capturePromise: null
   };
 
   /* Track pressed non-modifier keys so we can detect "is hotkey held" */
@@ -26,6 +27,7 @@
 
   function init() {
     globalThis.Overlay.init();
+    setupDispatcher();
     attachWindowLifecycle();
     attachKeyListeners();
 
@@ -37,6 +39,23 @@
     });
   }
 
+  function setupDispatcher() {
+    const dispatcher = globalThis.GestureDispatcher.createDispatcher();
+    dispatcher.onProgress((fraction) => {
+      globalThis.Overlay.setHoldProgress(fraction);
+    });
+    dispatcher.onTerminal((kind, payload) => {
+      if (kind === 'snippet') {
+        handleSnippet(payload);
+      } else if (kind === 'snapshot') {
+        handleSnapshot(payload);
+      } else if (kind === 'cancel') {
+        handleCancel();
+      }
+    });
+    state.dispatcher = dispatcher;
+  }
+
   function applySettings(settings) {
     state.settings = settings;
     state.enabled = !!(settings.hotkey && settings.hotkey.code);
@@ -46,11 +65,13 @@
   function attachWindowLifecycle() {
     window.addEventListener('blur', () => {
       pressedKeys.clear();
+      if (state.dispatcher) state.dispatcher.cancel('blur');
       deactivate();
     });
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
         pressedKeys.clear();
+        if (state.dispatcher) state.dispatcher.cancel('tab-switch');
         deactivate();
       }
     });
@@ -81,6 +102,13 @@
   function onKeyDown(event) {
     if (!state.enabled) return;
 
+    /* Esc during a hold cancels the gesture. Handled before hotkey checks
+       so it works regardless of whether the hotkey is currently held. */
+    if (event.key === 'Escape' && state.dispatcher && state.dispatcher.isHolding()) {
+      state.dispatcher.cancel('esc');
+      return;
+    }
+
     // Track all non-modifier keys
     if (!isModifierKey(event.key)) {
       pressedKeys.add(event.code);
@@ -93,38 +121,22 @@
       if (state.active && actionCode && event.code === actionCode && !event.repeat) {
         event.preventDefault();
         event.stopPropagation();
-        onCopyKey();
+        onActionKeyDown();
       }
     }
   }
 
-  function onCopyKey() {
-    if (state.pendingCopyTimeoutId) {
-      clearTimeout(state.pendingCopyTimeoutId);
-      state.pendingCopyTimeoutId = 0;
-      const target = state.pendingCopyTarget || state.target;
-      state.pendingCopyTarget = null;
-      onCopyAllShortcut(target);
-      return;
-    }
+  function onActionKeyDown() {
     const target = state.target;
-    if (!target) return;
-    state.pendingCopyTarget = target;
-    state.pendingCopyTimeoutId = setTimeout(() => {
-      const t = state.pendingCopyTarget;
-      state.pendingCopyTimeoutId = 0;
-      state.pendingCopyTarget = null;
-      if (!t) return;
-      onCopyShortcut(t);
-    }, DOUBLE_TAP_WINDOW_MS);
-  }
-
-  function cancelPendingCopy() {
-    if (state.pendingCopyTimeoutId) {
-      clearTimeout(state.pendingCopyTimeoutId);
-      state.pendingCopyTimeoutId = 0;
-    }
-    state.pendingCopyTarget = null;
+    if (!target || !state.dispatcher) return;
+    /* Target is locked at key-down. Cursor drift during the hold does not
+       retarget. */
+    state.holdTarget = target;
+    globalThis.Overlay.enterLockedTargetMode(target);
+    /* Pre-Compute is speculative — abandoned if dispatcher cancels or commits
+       a snippet before the threshold crosses. */
+    state.preCompute = globalThis.SnapshotPipeline.startPreCompute(target);
+    state.dispatcher.actionKeyDown(target);
   }
 
   function onKeyUp(event) {
@@ -133,8 +145,70 @@
       pressedKeys.delete(event.code);
     }
 
+    if (state.dispatcher && state.dispatcher.isHolding()) {
+      const actionCode = state.settings && state.settings.actionKey && state.settings.actionKey.code;
+      if (actionCode && event.code === actionCode) {
+        state.dispatcher.actionKeyUp();
+      } else if (!hotkeyHeld(event)) {
+        /* Hotkey released during a hold → cancel. */
+        state.dispatcher.cancel('hotkey-release');
+      }
+    }
+
     if (!state.active) return;
     if (!hotkeyHeld(event)) deactivate();
+  }
+
+  function clearGestureState() {
+    globalThis.Overlay.setHoldProgress(null);
+    globalThis.Overlay.exitLockedTargetMode();
+    state.holdTarget = null;
+    if (state.preCompute) {
+      state.preCompute.abort();
+      state.preCompute = null;
+    }
+    state.capturePromise = null;
+  }
+
+  function handleSnippet(target) {
+    /* Snippet: abandon Pre-Compute (no clipboard write from it), restore
+       cursor-driven overlay, fire the snippet path. */
+    clearGestureState();
+    onCopyShortcut(target);
+  }
+
+  async function handleSnapshot(target) {
+    /* Snapshot fired at threshold-cross. Pre-Compute is already running. */
+    const preCompute = state.preCompute;
+    state.preCompute = null;
+    globalThis.Overlay.exitLockedTargetMode();
+    globalThis.Overlay.setHoldProgress(null);
+    state.holdTarget = null;
+    if (!preCompute) return;
+    const includeScreenshot = !!(state.settings && state.settings.snapshot && state.settings.snapshot.includeScreenshot);
+    try {
+      let captureResult;
+      if (includeScreenshot) {
+        captureResult = await globalThis.SnapshotPipeline.capture(target);
+      } else {
+        captureResult = { box: globalThis.ElementCopy.boxFromRect(target), dataUrl: null };
+      }
+      const payload = await globalThis.SnapshotPipeline.commit(preCompute, captureResult);
+      if (!payload) return;
+      writeClipboard(payload);
+      if (state.active && state.target === target) {
+        /* Re-render so highlight layers come back cleanly, then flash. */
+        render();
+      }
+      globalThis.Overlay.flash();
+      globalThis.Overlay.showToast('All info copied!', state.cursor);
+    } catch (_) {
+      /* Capture failure produces no toast — silent regression-safe. */
+    }
+  }
+
+  function handleCancel() {
+    clearGestureState();
   }
 
   function activate() {
@@ -152,7 +226,7 @@
     detachInspectListeners();
     state.target = null;
     state.cachedStyle = null;
-    cancelPendingCopy();
+    clearGestureState();
     globalThis.Overlay.clearFlash();
     globalThis.Overlay.hideToast();
     globalThis.Overlay.hide();
@@ -292,33 +366,6 @@
     writeClipboard(line);
     globalThis.Overlay.flash();
     globalThis.Overlay.showToast('Copied!', state.cursor);
-  }
-
-  async function onCopyAllShortcut(target) {
-    const el = target || state.target;
-    if (!el) return;
-    const includeScreenshot = !!(state.settings && state.settings.snapshot && state.settings.snapshot.includeScreenshot);
-    if (includeScreenshot) {
-      // Hide the overlay for one frame so the captured viewport PNG does not
-      // include DOMLens chrome (highlight layers, info panel, toast).
-      globalThis.Overlay.hide();
-      globalThis.Overlay.hideToast();
-      await nextFramePaint();
-    }
-    const payload = await globalThis.ElementCopy.buildSnapshot(el, { includeScreenshot });
-    writeClipboard(payload);
-    if (includeScreenshot && state.active && state.target === el) {
-      // Re-render so highlight layers come back, then flash on top of them.
-      render();
-    }
-    globalThis.Overlay.flash();
-    globalThis.Overlay.showToast('All info copied!', state.cursor);
-  }
-
-  function nextFramePaint() {
-    return new Promise((resolve) => {
-      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-    });
   }
 
   function writeClipboard(text) {

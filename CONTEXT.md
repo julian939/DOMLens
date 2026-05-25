@@ -9,8 +9,12 @@ The active state entered while the [[hotkey]] is held — the extension tracks t
 _Avoid_: Peek mode, hover mode, inspection state
 
 **Action Key**:
-The key pressed in combination with the [[hotkey]] while in [[inspect-mode]] to capture the current element. A single press produces an [[element-snippet]]; a double press produces an [[element-snapshot]].
+The key pressed in combination with the [[hotkey]] while in [[inspect-mode]] to capture the current element. A short tap (press and release within the [[hold-gesture]] threshold) produces an [[element-snippet]]; a [[hold-gesture]] produces an [[element-snapshot]].
 _Avoid_: Capture key, trigger key, copy key
+
+**Hold Gesture**:
+Pressing and holding the [[action-key]] past a fixed threshold (300 ms) to commit to an [[element-snapshot]]. The target element is locked at key-down (cursor movement during the hold does not retarget), an inline progress indicator fills on the [[info-panel]] during the hold, and crossing the threshold triggers the capture. Releasing the [[action-key]] before the threshold, releasing the [[hotkey]], pressing `Esc`, switching tabs, or window blur cancels the hold without copying.
+_Avoid_: Long-press, held action, pressing, double-tap
 
 **Info Panel**:
 The floating, read-only overlay that appears next to the cursor while inspecting, showing the element's selector followed by the user's enabled [[info-fields]]. Non-interactive (`pointer-events: none`).

@@ -58,11 +58,11 @@ Four semi-transparent layers highlight the hovered element's box model:
 
 Only non-zero layers are drawn, so a button with no margin only shows three of them. You instantly _see_ the spacing instead of mentally piecing it together from numbers.
 
-### Copy to Clipboard — One Tap or Two
+### Copy to Clipboard — Tap or Hold
 
-While holding the hotkey, press the **action key** (default: **C**) to copy. The action key has two modes depending on how fast you press it:
+While holding the hotkey, press the **action key** (default: **C**) to copy. The action key has two modes depending on how long you press it:
 
-**Single tap → Element Snippet** (compact, one-line HTML)
+**Tap → Element Snippet** (compact, one-line HTML)
 
 ```html
 <button data-testid="submit-btn" class="btn-primary">Submit form</button>
@@ -70,7 +70,9 @@ While holding the hotkey, press the **action key** (default: **C**) to copy. The
 
 Use this when you want to **quickly reference an element** — in a Slack message, a bug report, or a quick prompt to your AI. DOMLens strips utility classes (Tailwind, CSS modules, Emotion hashes) and keeps only the attributes that actually identify the element: `id`, `data-testid`, `aria-label`, `role`, and so on.
 
-**Double tap (within 250 ms) → Element Snapshot** (full structured JSON)
+**Hold (300 ms) → Element Snapshot** (full structured JSON)
+
+A progress indicator on the info panel fills while you hold; when it completes, the snapshot is captured. Release before 300 ms and you get the snippet instead. Pressing `Esc`, releasing the hotkey, or switching tabs cancels the hold.
 
 ```json
 {

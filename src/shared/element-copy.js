@@ -350,8 +350,12 @@
     }
   }
 
-  async function buildSnapshot(el, options) {
-    const includeScreenshot = !options || options.includeScreenshot !== false;
+  /*
+   * Build everything in a snapshot except the screenshot. Used by the new
+   * pipeline (issue 06) as the Pre-Compute phase — kicked off at key-down,
+   * safe to abandon if the gesture cancels.
+   */
+  function buildSnapshotSansScreenshot(el) {
     const selector = buildUniqueSelector(el);
     const rect = el.getBoundingClientRect();
     const box = {
@@ -361,7 +365,7 @@
       y: Math.round(rect.top)
     };
     const meta = buildMeta();
-    const snapshot = {
+    return {
       selector,
       box,
       html: el.outerHTML || '',
@@ -370,8 +374,23 @@
       assets: globalThis.AssetCollector.collect(el),
       meta
     };
+  }
+
+  function boxFromRect(el) {
+    const rect = el.getBoundingClientRect();
+    return {
+      width: Math.round(rect.width),
+      height: Math.round(rect.height),
+      x: Math.round(rect.left),
+      y: Math.round(rect.top)
+    };
+  }
+
+  async function buildSnapshot(el, options) {
+    const includeScreenshot = !options || options.includeScreenshot !== false;
+    const snapshot = buildSnapshotSansScreenshot(el);
     if (includeScreenshot) {
-      const screenshot = await captureElementScreenshot(box, meta.devicePixelRatio);
+      const screenshot = await captureElementScreenshot(snapshot.box, snapshot.meta.devicePixelRatio);
       if (screenshot) snapshot.screenshot = screenshot;
     }
     return JSON.stringify(snapshot);
@@ -379,6 +398,9 @@
 
   globalThis.ElementCopy = {
     buildSnippet,
-    buildSnapshot
+    buildSnapshot,
+    buildSnapshotSansScreenshot,
+    boxFromRect,
+    requestViewportCapture
   };
 })();
