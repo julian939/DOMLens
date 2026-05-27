@@ -12,9 +12,10 @@
   const CAPTURE_FADE_MS = 280;
   const CAPTURE_SCAN_MS = 1200;
   const CAPTURE_CHARGE_MS = 1000;
-  const CAPTURE_BORDER_PX = 4;
-  const CAPTURE_RING_BLUE = '#1E40AF';
-  const CAPTURE_RING_GLOW = '0 0 0 1px rgba(30, 64, 175, 0.35), 0 0 12px 2px rgba(30, 64, 175, 0.55), 0 0 28px 6px rgba(59, 130, 246, 0.35)';
+  const CAPTURE_BAND_MIN_PX = 2;
+  const CAPTURE_BAND_MAX_PX = 4;
+  const CAPTURE_BAND_FACTOR = 0.02;
+  const CAPTURE_INNER_EDGE_PX = 1;
   const CAPTURE_SCAN_GLOW = '0 0 0 1px rgba(124, 58, 237, 0.4), 0 0 16px 3px rgba(219, 39, 119, 0.5), 0 0 36px 8px rgba(59, 130, 246, 0.4)';
 
   const GEMINI_GRADIENT_STOPS = '#1E40AF, #3B82F6, #7C3AED, #DB2777, #F59E0B, #1E40AF';
@@ -160,7 +161,7 @@
         pointer-events: none;
         display: none;
         box-sizing: border-box;
-        padding: ${CAPTURE_BORDER_PX}px;
+        padding: var(--domlens-band, ${CAPTURE_BAND_MAX_PX}px);
         opacity: 0;
         -webkit-mask:
           linear-gradient(#000, #000) content-box,
@@ -171,15 +172,22 @@
           linear-gradient(#000, #000);
         mask-composite: exclude;
       }
+      .capture-ring::before {
+        content: '';
+        position: absolute;
+        box-sizing: border-box;
+        inset: var(--domlens-band, ${CAPTURE_BAND_MAX_PX}px);
+        border-radius: var(--domlens-inner-radius, 0);
+        box-shadow: 0 0 0 ${CAPTURE_INNER_EDGE_PX}px rgba(20, 20, 28, 0.95);
+        pointer-events: none;
+      }
       .capture-ring.visible { display: block; }
       .capture-ring.active {
         opacity: 1;
         background: conic-gradient(from 0deg, ${GEMINI_GRADIENT_STOPS});
-        box-shadow: ${CAPTURE_SCAN_GLOW};
       }
       .capture-ring.popping {
         background: conic-gradient(from 0deg, ${GEMINI_GRADIENT_STOPS});
-        box-shadow: ${CAPTURE_SCAN_GLOW};
         animation: domlens-capture-pop ${CAPTURE_POP_MS}ms ease-out 1 forwards;
       }
       .capture-ring.charging {
@@ -456,12 +464,20 @@
     return parseFloat(raw) || 0;
   }
 
+  function computeBandWidth(rect) {
+    const size = (rect.width + rect.height) / 2;
+    return Math.max(
+      CAPTURE_BAND_MIN_PX,
+      Math.min(size * CAPTURE_BAND_FACTOR, CAPTURE_BAND_MAX_PX)
+    );
+  }
+
   function placeCaptureRingToRect(rect, el) {
     if (rect.width <= 0 || rect.height <= 0) {
       captureRingEl.style.display = 'none';
       return;
     }
-    const pad = CAPTURE_BORDER_PX;
+    const pad = computeBandWidth(rect);
     const vw = window.innerWidth;
     const vh = window.innerHeight;
 
@@ -482,6 +498,8 @@
       rect.right + pad > vw ||
       rect.bottom + pad > vh;
 
+    captureRingEl.style.setProperty('--domlens-band', `${pad}px`);
+
     if (outsideClipped) {
       captureRingEl.style.top = `${rect.top}px`;
       captureRingEl.style.left = `${rect.left}px`;
@@ -489,6 +507,10 @@
       captureRingEl.style.height = `${rect.height}px`;
       captureRingEl.style.borderRadius =
         `${Math.max(0, tl - pad)}px ${Math.max(0, tr - pad)}px ${Math.max(0, br - pad)}px ${Math.max(0, bl - pad)}px`;
+      captureRingEl.style.setProperty(
+        '--domlens-inner-radius',
+        `${Math.max(0, tl - 2 * pad)}px ${Math.max(0, tr - 2 * pad)}px ${Math.max(0, br - 2 * pad)}px ${Math.max(0, bl - 2 * pad)}px`
+      );
     } else {
       captureRingEl.style.top = `${rect.top - pad}px`;
       captureRingEl.style.left = `${rect.left - pad}px`;
@@ -496,6 +518,10 @@
       captureRingEl.style.height = `${rect.height + pad * 2}px`;
       captureRingEl.style.borderRadius =
         `${tl ? tl + pad : 0}px ${tr ? tr + pad : 0}px ${br ? br + pad : 0}px ${bl ? bl + pad : 0}px`;
+      captureRingEl.style.setProperty(
+        '--domlens-inner-radius',
+        `${tl}px ${tr}px ${br}px ${bl}px`
+      );
     }
   }
 
@@ -628,11 +654,23 @@
     const gap = 8;
     let left = elementRect.left + elementRect.width / 2 - toastRect.width / 2;
     left = Math.max(4, Math.min(left, vw - toastRect.width - 4));
-    let top = elementRect.bottom + gap;
-    if (top + toastRect.height > vh - 4) {
-      top = elementRect.top - toastRect.height - gap;
+
+    const candidates = [
+      elementRect.bottom + gap,
+      elementRect.top - toastRect.height - gap,
+      elementRect.bottom - toastRect.height - gap,
+      elementRect.top + gap,
+    ];
+    let top = null;
+    for (const t of candidates) {
+      if (t >= 4 && t + toastRect.height <= vh - 4) {
+        top = t;
+        break;
+      }
     }
-    top = Math.max(4, top);
+    if (top === null) {
+      top = Math.max(4, Math.min(elementRect.bottom + gap, vh - toastRect.height - 4));
+    }
     toast.style.left = `${left}px`;
     toast.style.top = `${top}px`;
     void toast.offsetWidth;
