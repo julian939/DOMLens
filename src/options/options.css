@@ -1,213 +1,226 @@
 /* ══════════════════════════════════════════════════════
-   DOMLens — Medieval Retro Theme
-   Inspired by the golden magnifying-glass icon
+   DOMLens — Gemini Theme
+   Quiet dark surface, gradient accents where it matters
    ══════════════════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=MedievalSharp&family=Crimson+Text:ital,wght@0,400;0,600;0,700;1,400&display=swap');
-
 :root {
-  /* Parchment palette */
-  --bg:           #2a1f14;
-  --bg-grain:     #342618;
-  --card:         #3d2e1f;
-  --card-hover:   #4a3828;
-  --text:         #e8dcc8;
-  --subtle:       #b8a68e;
-  --border:       #5c472f;
-  --border-light: #6e5639;
+  /* Surface palette */
+  --bg:           #0f0f14;
+  --bg-elev:      #16161d;
+  --card:         rgba(255, 255, 255, 0.03);
+  --card-hover:   rgba(255, 255, 255, 0.05);
+  --text:         #ececf1;
+  --subtle:       #8e8ea0;
+  --muted:        #6b6b7b;
+  --border:       rgba(255, 255, 255, 0.08);
+  --border-strong:rgba(255, 255, 255, 0.14);
+  --input-bg:     rgba(255, 255, 255, 0.04);
 
-  /* Gold accents — matching the icon rim */
-  --gold:         #c9a84c;
-  --gold-bright:  #e4c76b;
-  --gold-soft:    rgba(201, 168, 76, 0.15);
-  --gold-glow:    rgba(201, 168, 76, 0.25);
+  /* Gemini rainbow stops — matches overlay.js GEMINI_GRADIENT_STOPS */
+  --grad: linear-gradient(135deg, #1E40AF 0%, #3B82F6 22%, #7C3AED 48%, #DB2777 72%, #F59E0B 100%);
+  --grad-conic: conic-gradient(from 0deg, #1E40AF, #3B82F6, #7C3AED, #DB2777, #F59E0B, #1E40AF);
+  --grad-soft: linear-gradient(135deg, rgba(59, 130, 246, 0.14), rgba(124, 58, 237, 0.14), rgba(219, 39, 119, 0.14));
 
-  /* Warn / danger — deep red like royal seals */
-  --warn:         #c45a3a;
-  --warn-bg:      rgba(196, 90, 58, 0.1);
-  --warn-border:  rgba(196, 90, 58, 0.3);
+  /* Warn */
+  --warn:         #f87171;
+  --warn-bg:      rgba(248, 113, 113, 0.08);
+  --warn-border:  rgba(248, 113, 113, 0.3);
 
   /* Fonts */
-  --font-heading: 'MedievalSharp', cursive;
-  --font-body:    'Crimson Text', 'Georgia', serif;
+  --font-body:    -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", system-ui, sans-serif;
   --font-mono:    ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
-/* ── Page background with parchment grain ──────────── */
-
-html,
-body {
+html, body {
   margin: 0;
   padding: 0;
   background: var(--bg);
-  background-image:
-    radial-gradient(ellipse at 20% 50%, rgba(201, 168, 76, 0.04) 0%, transparent 70%),
-    radial-gradient(ellipse at 80% 20%, rgba(201, 168, 76, 0.03) 0%, transparent 60%);
   color: var(--text);
   font-family: var(--font-body);
-  font-size: 15px;
-  line-height: 1.65;
+  font-size: 14px;
+  line-height: 1.6;
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Ambient shimmer — slow-drifting blobs in the brand colours.
+   Sized larger than the viewport so movement stays full-bleed at the edges. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: -40%;
+  background:
+    radial-gradient(ellipse 55% 45% at 15% 18%, rgba(59, 130, 246, 0.32), transparent 65%),
+    radial-gradient(ellipse 50% 42% at 85% 28%, rgba(124, 58, 237, 0.30), transparent 65%),
+    radial-gradient(ellipse 58% 48% at 75% 82%, rgba(219, 39, 119, 0.26), transparent 65%),
+    radial-gradient(ellipse 52% 44% at 20% 78%, rgba(245, 158, 11, 0.20), transparent 65%),
+    radial-gradient(ellipse 45% 40% at 50% 50%, rgba(124, 58, 237, 0.16), transparent 70%);
+  filter: blur(60px);
+  pointer-events: none;
+  z-index: 0;
+  animation: domlens-shimmer 40s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 0%, rgba(15, 15, 20, 0.25) 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes domlens-shimmer {
+  0%   { transform: translate3d(-3%, -2%, 0) scale(1.00) rotate(0deg); }
+  25%  { transform: translate3d( 2%, -3%, 0) scale(1.06) rotate(2deg); }
+  50%  { transform: translate3d( 3%,  2%, 0) scale(1.10) rotate(-1deg); }
+  75%  { transform: translate3d(-2%,  3%, 0) scale(1.04) rotate(1deg); }
+  100% { transform: translate3d( 1%, -1%, 0) scale(1.08) rotate(-2deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before { animation: none; }
 }
 
 .container {
+  position: relative;
+  z-index: 1;
   max-width: 640px;
   margin: 0 auto;
-  padding: 48px 24px 96px;
+  padding: 56px 24px 96px;
 }
 
 /* ── Header ────────────────────────────────────────── */
 
 header {
   text-align: center;
-  margin-bottom: 36px;
+  margin-bottom: 40px;
 }
 
 header h1 {
-  margin: 0 0 6px;
-  font-family: var(--font-heading);
-  font-size: 36px;
-  font-weight: 400;
-  color: var(--gold-bright);
-  letter-spacing: 0.06em;
-  text-shadow: 0 0 24px rgba(201, 168, 76, 0.3),
-               0 2px 4px rgba(0, 0, 0, 0.4);
-}
-
-/* Decorative divider below title */
-header h1::after {
-  content: '⚜  ◆  ⚜';
-  display: block;
-  margin-top: 10px;
-  font-size: 14px;
-  letter-spacing: 0.3em;
-  color: var(--gold);
-  opacity: 0.5;
-  text-shadow: none;
+  margin: 0 0 14px;
+  font-size: 40px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  background: var(--grad);
+  -webkit-background-clip: text;
+          background-clip: text;
+  color: transparent;
+  display: inline-block;
 }
 
 .lead {
-  margin: 0;
+  margin: 0 auto;
   color: var(--subtle);
-  font-size: 14px;
-  line-height: 1.7;
+  font-size: 13.5px;
+  line-height: 1.65;
   max-width: 520px;
-  margin-left: auto;
-  margin-right: auto;
 }
 
 /* ── Cards ─────────────────────────────────────────── */
 
 .card {
+  position: relative;
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 24px 26px;
-  position: relative;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25),
-              inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  border-radius: 14px;
+  padding: 22px 24px;
+  transition: border-color 0.2s ease, background 0.2s ease;
+  backdrop-filter: blur(8px);
 }
 
 .card:hover {
-  border-color: var(--border-light);
-}
-
-/* Top gold ornament line on cards */
-.card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 20px;
-  right: 20px;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--gold) 30%, var(--gold) 70%, transparent);
-  opacity: 0.3;
+  border-color: var(--border-strong);
+  background: var(--card-hover);
 }
 
 .card h2 {
-  margin: 0 0 8px;
-  font-family: var(--font-heading);
-  font-size: 20px;
-  font-weight: 400;
-  color: var(--gold);
-  letter-spacing: 0.03em;
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.005em;
 }
 
 .hint {
-  margin: 0 0 18px;
+  margin: 0 0 16px;
   color: var(--subtle);
-  font-size: 13.5px;
+  font-size: 13px;
   line-height: 1.6;
+}
+
+.container > .card + .card {
+  margin-top: 16px;
 }
 
 /* ── Key Recorder ──────────────────────────────────── */
 
 .key-recorder {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 14px 18px;
-  border: 2px solid var(--border);
-  border-radius: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
   cursor: pointer;
-  background: var(--bg-grain);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  background: var(--input-bg);
+  transition: border-color 0.2s ease, background 0.2s ease;
   outline: none;
   user-select: none;
 }
 
 .key-recorder:hover {
-  border-color: var(--border-light);
-  background: var(--card-hover);
+  border-color: var(--border-strong);
+  background: rgba(255, 255, 255, 0.06);
 }
 
+/* Gradient border ring on focus / recording — same trick as the toast */
 .key-recorder:focus,
 .key-recorder.recording {
-  border-color: var(--gold);
-  box-shadow: 0 0 0 3px var(--gold-soft),
-              0 0 16px rgba(201, 168, 76, 0.1);
+  border-color: transparent;
+  background:
+    linear-gradient(var(--bg-elev), var(--bg-elev)) padding-box,
+    var(--grad-conic) border-box;
+  box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.12);
 }
 
 .key-recorder.recording .recorder-label {
-  color: var(--gold-bright);
-  font-weight: 600;
+  color: var(--text);
+  font-weight: 500;
 }
 
 .key-recorder.recording .recorder-key {
-  opacity: 0.4;
+  opacity: 0.45;
   animation: pulse-key 1.2s ease-in-out infinite;
 }
 
 .recorder-label {
-  font-size: 13.5px;
+  font-size: 13px;
   color: var(--subtle);
   transition: color 0.2s ease;
 }
 
 .recorder-key {
   font-family: var(--font-mono);
-  font-size: 14px;
+  font-size: 12.5px;
   font-weight: 600;
-  color: var(--gold-bright);
-  background: rgba(201, 168, 76, 0.1);
-  border: 1px solid var(--gold);
-  border-radius: 4px;
-  padding: 5px 14px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 4px 12px;
   min-width: 44px;
   text-align: center;
-  transition: opacity 0.2s ease, background 0.2s ease;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3),
-              inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: opacity 0.2s ease;
 }
 
 @keyframes pulse-key {
-  0%, 100% { opacity: 0.4; }
+  0%, 100% { opacity: 0.45; }
   50%      { opacity: 0.15; }
 }
 
@@ -216,27 +229,24 @@ header h1::after {
 .status {
   border-top: 1px solid var(--border);
   padding-top: 14px;
-  margin-top: 18px;
-  font-size: 13.5px;
+  margin-top: 16px;
+  font-size: 13px;
   color: var(--subtle);
 }
 
 .status strong {
-  color: var(--gold-bright);
+  color: var(--text);
   font-family: var(--font-mono);
+  font-weight: 600;
 }
 
 .status.warn {
   color: var(--warn);
   background: var(--warn-bg);
-  border-radius: 4px;
-  padding: 10px 14px;
+  border-radius: 8px;
+  padding: 10px 12px;
   border: 1px solid var(--warn-border);
   border-top-color: var(--warn-border);
-}
-
-.container > .card + .card {
-  margin-top: 22px;
 }
 
 /* ── Info Fields ───────────────────────────────────── */
@@ -244,81 +254,102 @@ header h1::after {
 .hint code {
   font-family: var(--font-mono);
   font-size: 12px;
-  background: rgba(201, 168, 76, 0.1);
-  color: var(--gold-bright);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
   padding: 2px 6px;
-  border-radius: 3px;
-  border: 1px solid rgba(201, 168, 76, 0.2);
+  border-radius: 4px;
+  border: 1px solid var(--border);
 }
 
 .info-fields {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 18px;
 }
 
 .field-group h3 {
   margin: 0 0 10px;
-  font-family: var(--font-heading);
-  font-size: 13px;
-  font-weight: 400;
+  font-size: 11px;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--gold);
-  opacity: 0.7;
-}
-
-/* Small decorative line under group headings */
-.field-group h3::after {
-  content: '';
-  display: block;
-  margin-top: 6px;
-  width: 40px;
-  height: 1px;
-  background: var(--gold);
-  opacity: 0.3;
+  letter-spacing: 0.08em;
+  color: var(--muted);
 }
 
 .field-list {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px 14px;
+  gap: 8px 10px;
 }
 
 .field {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 9px 14px;
+  padding: 8px 12px;
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: 8px;
   cursor: pointer;
-  background: var(--bg-grain);
+  background: var(--input-bg);
   transition: border-color 0.15s ease, background 0.15s ease;
-  font-size: 13.5px;
+  font-size: 13px;
+  color: var(--text);
 }
 
 .field:hover {
-  border-color: var(--border-light);
-  background: var(--card-hover);
+  border-color: var(--border-strong);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .field input[type="checkbox"] {
   margin: 0;
-  accent-color: var(--gold);
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 0 0 16px;
   width: 16px;
   height: 16px;
+  border-radius: 4px;
+  border: 1.5px solid var(--border-strong);
+  background: transparent;
+  cursor: pointer;
+  display: grid;
+  place-content: center;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.field input[type="checkbox"]:hover {
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.field input[type="checkbox"]:checked {
+  border-color: var(--text);
+  background: var(--text);
+}
+
+.field input[type="checkbox"]:checked::after {
+  content: '';
+  width: 9px;
+  height: 9px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path fill='none' stroke='%230f0f14' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='M2.5 6.5l2.5 2.5 4.5-5'/></svg>");
+  background-size: contain;
+  background-repeat: no-repeat;
+}
+
+.field input[type="checkbox"]:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.3);
+  outline-offset: 2px;
 }
 
 .snapshot-toggle {
   align-items: flex-start;
-  padding: 12px 16px;
+  padding: 12px 14px;
   gap: 12px;
-  font-size: 14px;
+  font-size: 13.5px;
 }
 
 .snapshot-toggle input[type="checkbox"] {
-  margin-top: 2px;
+  align-self: flex-start;
+  transform: translateY(3px);
 }
 
 .field-sub {
@@ -327,6 +358,7 @@ header h1::after {
   color: var(--subtle);
   font-size: 12.5px;
   line-height: 1.5;
+  font-weight: 400;
 }
 
 /* ── Reset ─────────────────────────────────────────── */
@@ -338,62 +370,47 @@ header h1::after {
   gap: 16px;
 }
 
-.reset-card h2 {
-  margin: 0 0 4px;
-}
-
-.reset-card .hint {
-  margin: 0;
-}
+.reset-card h2 { margin: 0 0 4px; }
+.reset-card .hint { margin: 0; }
 
 .btn-reset {
   flex-shrink: 0;
-  font-family: var(--font-heading);
-  font-size: 14px;
-  font-weight: 400;
-  letter-spacing: 0.03em;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
   color: var(--warn);
-  background: var(--bg-grain);
+  background: var(--warn-bg);
   border: 1px solid var(--warn-border);
-  border-radius: 4px;
-  padding: 9px 20px;
+  border-radius: 8px;
+  padding: 9px 18px;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .btn-reset:hover {
-  background: var(--warn-bg);
+  background: rgba(248, 113, 113, 0.14);
   border-color: var(--warn);
-  color: #e06b4a;
-  box-shadow: 0 0 12px rgba(196, 90, 58, 0.15);
+  color: #fca5a5;
 }
 
 .btn-reset:active {
-  background: rgba(196, 90, 58, 0.15);
+  background: rgba(248, 113, 113, 0.2);
 }
 
 /* ── Scrollbar ─────────────────────────────────────── */
 
-::-webkit-scrollbar {
-  width: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: var(--bg);
-}
-
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  border: 2px solid var(--bg);
 }
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--border-light);
-}
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); }
 
 /* ── Selection ─────────────────────────────────────── */
 
 ::selection {
-  background: var(--gold-soft);
-  color: var(--gold-bright);
+  background: rgba(124, 58, 237, 0.4);
+  color: #fff;
 }

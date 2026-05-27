@@ -204,9 +204,10 @@
       `classes, dimensions, position, colors, and typography. Releasing the hotkey exits Inspect Mode. ` +
       `Press the Action Key (<strong>${escapeHtml(ak)}</strong>) while holding the hotkey to copy an element snippet ` +
       `(a unique CSS selector plus any visible text) to the clipboard — ` +
-      `the highlight briefly flashes green to confirm. ` +
-      `Press the Action Key twice in quick succession to copy a full element snapshot ` +
-      `(HTML, box, computed styles, and text).`;
+      `a deep-blue capture ring pops around the element to confirm the capture. ` +
+      `Hold the Action Key past the threshold to copy a full element snapshot ` +
+      `(HTML, box, computed styles, and text); the deep-blue ring transitions ` +
+      `into a multi-colour scanner that sweeps around the element while the snapshot is captured.`;
   }
 
   function escapeHtml(s) {

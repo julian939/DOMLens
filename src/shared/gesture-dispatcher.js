@@ -1,18 +1,6 @@
-/*
- * Action Key Gesture Dispatcher.
- *
- * Pure-logic state machine: translates a stream of Action Key events
- * (`actionKeyDown`, `actionKeyUp`, `cancel`) into terminal gesture outcomes
- * (`snippet`, `snapshot`, `cancel`). Knows nothing about DOM, clipboard, or
- * overlay. Threshold is 300 ms, fixed.
- *
- * Boundary semantics: a release strictly before 300 ms emits `snippet`. The
- * snapshot fires at the threshold timer's tick. At exactly 300 ms the timer
- * wins (snapshot) because the dispatcher resets state before any same-tick
- * key-up can be processed by the caller.
- */
 (function () {
-  var HOLD_THRESHOLD_MS = 300;
+  var SNIPPET_MAX_MS = 300;
+  var SNAPSHOT_MIN_MS = 1300;
   var PROGRESS_INTERVAL_MS = 16;
 
   function createDispatcher(opts) {
@@ -23,15 +11,18 @@
 
     var progressListeners = [];
     var terminalListeners = [];
+    var zoneListeners = [];
 
     var state = 'idle';
     var target = null;
     var startedAt = 0;
-    var thresholdTimerId = null;
+    var deadZoneTimerId = null;
+    var snapshotTimerId = null;
     var progressTimerId = null;
 
     function onProgress(fn) { progressListeners.push(fn); }
     function onTerminal(fn) { terminalListeners.push(fn); }
+    function onZoneChange(fn) { zoneListeners.push(fn); }
 
     function emitProgress(fraction) {
       for (var i = 0; i < progressListeners.length; i++) progressListeners[i](fraction);
@@ -39,9 +30,13 @@
     function emitTerminal(kind, payload) {
       for (var i = 0; i < terminalListeners.length; i++) terminalListeners[i](kind, payload);
     }
+    function emitZone(zone) {
+      for (var i = 0; i < zoneListeners.length; i++) zoneListeners[i](zone);
+    }
 
     function resetTimers() {
-      if (thresholdTimerId !== null) { clearTimer(thresholdTimerId); thresholdTimerId = null; }
+      if (deadZoneTimerId !== null) { clearTimer(deadZoneTimerId); deadZoneTimerId = null; }
+      if (snapshotTimerId !== null) { clearTimer(snapshotTimerId); snapshotTimerId = null; }
       if (progressTimerId !== null) { clearTimer(progressTimerId); progressTimerId = null; }
     }
 
@@ -54,9 +49,9 @@
 
     function tickProgress() {
       progressTimerId = null;
-      if (state !== 'holding') return;
+      if (state !== 'snippet-zone' && state !== 'dead-zone') return;
       var elapsed = now() - startedAt;
-      var fraction = elapsed / HOLD_THRESHOLD_MS;
+      var fraction = elapsed / SNAPSHOT_MIN_MS;
       if (fraction > 1) fraction = 1;
       if (fraction < 0) fraction = 0;
       emitProgress(fraction);
@@ -65,11 +60,20 @@
       }
     }
 
-    function onThresholdCross() {
-      thresholdTimerId = null;
-      if (state !== 'holding') return;
+    function onDeadZone() {
+      deadZoneTimerId = null;
+      if (state !== 'snippet-zone') return;
+      state = 'dead-zone';
+      emitZone('dead-zone');
+    }
+
+    function onSnapshotThreshold() {
+      snapshotTimerId = null;
+      if (state !== 'dead-zone') return;
       var t = target;
+      state = 'snapshot-zone';
       emitProgress(1);
+      emitZone('snapshot-zone');
       resetAll();
       emitTerminal('snapshot', t);
     }
@@ -77,29 +81,34 @@
     function actionKeyDown(t) {
       if (state !== 'idle') return;
       target = t;
-      state = 'holding';
+      state = 'snippet-zone';
       startedAt = now();
+      emitZone('snippet-zone');
       emitProgress(0);
-      thresholdTimerId = setTimer(onThresholdCross, HOLD_THRESHOLD_MS);
+      deadZoneTimerId = setTimer(onDeadZone, SNIPPET_MAX_MS);
+      snapshotTimerId = setTimer(onSnapshotThreshold, SNAPSHOT_MIN_MS);
       progressTimerId = setTimer(tickProgress, PROGRESS_INTERVAL_MS);
     }
 
     function actionKeyUp() {
-      if (state !== 'holding') return;
-      var elapsed = now() - startedAt;
-      if (elapsed >= HOLD_THRESHOLD_MS) return;
-      var t = target;
-      resetAll();
-      emitTerminal('snippet', t);
+      if (state === 'snippet-zone') {
+        var t = target;
+        resetAll();
+        emitTerminal('snippet', t);
+      } else if (state === 'dead-zone') {
+        resetAll();
+        emitTerminal('cancel', 'dead-zone-release');
+      }
+      /* snapshot-zone: no-op */
     }
 
     function cancel(reason) {
-      if (state !== 'holding') return;
+      if (state === 'idle') return;
       resetAll();
       emitTerminal('cancel', reason);
     }
 
-    function isHolding() { return state === 'holding'; }
+    function isHolding() { return state !== 'idle'; }
 
     return {
       actionKeyDown: actionKeyDown,
@@ -107,12 +116,14 @@
       cancel: cancel,
       onProgress: onProgress,
       onTerminal: onTerminal,
+      onZoneChange: onZoneChange,
       isHolding: isHolding,
-      HOLD_THRESHOLD_MS: HOLD_THRESHOLD_MS
+      SNIPPET_MAX_MS: SNIPPET_MAX_MS,
+      SNAPSHOT_MIN_MS: SNAPSHOT_MIN_MS
     };
   }
 
-  var api = { createDispatcher: createDispatcher, HOLD_THRESHOLD_MS: HOLD_THRESHOLD_MS };
+  var api = { createDispatcher: createDispatcher, SNIPPET_MAX_MS: SNIPPET_MAX_MS, SNAPSHOT_MIN_MS: SNAPSHOT_MIN_MS };
 
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = api;
