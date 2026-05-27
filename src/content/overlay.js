@@ -651,7 +651,8 @@
     const toastRect = toast.getBoundingClientRect();
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    const gap = 8;
+    const avgSize = (elementRect.width + elementRect.height) / 2;
+    const gap = Math.max(8, Math.min(avgSize * 0.05, 22));
     let left = elementRect.left + elementRect.width / 2 - toastRect.width / 2;
     left = Math.max(4, Math.min(left, vw - toastRect.width - 4));
 
