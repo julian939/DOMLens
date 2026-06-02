@@ -34,6 +34,8 @@
         "src/shared/asset-collector.js",
         "src/shared/screenshot-crop.js",
         "src/shared/gesture-dispatcher.js",
+        "src/shared/scroll-navigator.js",
+        "src/shared/wheel-step.js",
         "src/shared/element-copy.js",
         "src/shared/snapshot-pipeline.js",
         "src/content/overlay.js",

@@ -1,5 +1,5 @@
 (async () => {
-  const { DEFAULTS, load, save, onChange, MODIFIER_KEYS, INFO_FIELD_DEFAULTS, DEFAULT_SNAPSHOT_OPTIONS } = globalThis.InspectSettings;
+  const { DEFAULTS, load, save, onChange, MODIFIER_KEYS, INFO_FIELD_DEFAULTS, DEFAULT_SNAPSHOT_OPTIONS, DEFAULT_SNIPPET_OPTIONS } = globalThis.InspectSettings;
   const { GROUPS, REGISTRY } = globalThis.InfoFields;
 
   const hotkeyRecorder = document.getElementById('hotkey-recorder');
@@ -10,9 +10,13 @@
   const leadText = document.getElementById('lead-text');
   const infoFieldsContainer = document.getElementById('info-fields');
   const includeScreenshotCb = document.getElementById('include-screenshot');
+  const snippetTripleQuoteCb = document.getElementById('snippet-triple-quote');
+  const scrollNavigationCb = document.getElementById('scroll-navigation');
   const resetButton = document.getElementById('reset-button');
 
   includeScreenshotCb.addEventListener('change', persist);
+  snippetTripleQuoteCb.addEventListener('change', persist);
+  scrollNavigationCb.addEventListener('change', persist);
 
   const isMac = /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent || '');
 
@@ -124,8 +128,32 @@
   buildInfoFieldsUI();
 
   function buildInfoFieldsUI() {
+    const textField = REGISTRY.find((f) => f.id === 'text');
+    if (textField) {
+      const wrap = document.createElement('div');
+      wrap.className = 'field-group field-group-top';
+
+      const list = document.createElement('div');
+      list.className = 'field-list';
+      const label = document.createElement('label');
+      label.className = 'field';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.dataset.field = textField.id;
+      cb.addEventListener('change', persist);
+      const text = document.createElement('span');
+      text.textContent = textField.label;
+      label.appendChild(cb);
+      label.appendChild(text);
+      list.appendChild(label);
+      wrap.appendChild(list);
+      infoFieldsContainer.appendChild(wrap);
+      infoFieldCheckboxes.push(cb);
+    }
+
     const fieldsByGroup = new Map();
     for (const field of REGISTRY) {
+      if (field.id === 'text') continue;
       if (!fieldsByGroup.has(field.group)) fieldsByGroup.set(field.group, []);
       fieldsByGroup.get(field.group).push(field);
     }
@@ -171,7 +199,9 @@
       hotkey: { ...settings.hotkey },
       actionKey: { ...settings.actionKey },
       infoFields: { ...settings.infoFields },
-      snapshot: { ...settings.snapshot }
+      snapshot: { ...settings.snapshot },
+      scrollNavigation: !!settings.scrollNavigation,
+      snippetTripleQuoteBlock: settings.snippetTripleQuoteBlock !== false
     };
 
     hotkeyDisplay.textContent = prettyKeyLabel(settings.hotkey);
@@ -186,6 +216,8 @@
 
     const snapshot = settings.snapshot || DEFAULT_SNAPSHOT_OPTIONS;
     includeScreenshotCb.checked = !!snapshot.includeScreenshot;
+    snippetTripleQuoteCb.checked = settings.snippetTripleQuoteBlock !== false;
+    scrollNavigationCb.checked = !!settings.scrollNavigation;
   }
 
   function renderStatus(settings) {
@@ -234,7 +266,9 @@
       hotkey: currentSettings.hotkey,
       actionKey: currentSettings.actionKey,
       infoFields: readInfoFields(),
-      snapshot: { includeScreenshot: includeScreenshotCb.checked }
+      snapshot: { includeScreenshot: includeScreenshotCb.checked },
+      scrollNavigation: scrollNavigationCb.checked,
+      snippetTripleQuoteBlock: snippetTripleQuoteCb.checked
     };
     await save(settings);
     renderStatus(settings);
@@ -250,7 +284,9 @@
       hotkey: { ...DEFAULTS.hotkey },
       actionKey: { ...DEFAULTS.actionKey },
       infoFields: { ...INFO_FIELD_DEFAULTS },
-      snapshot: { ...DEFAULT_SNAPSHOT_OPTIONS }
+      snapshot: { ...DEFAULT_SNAPSHOT_OPTIONS },
+      scrollNavigation: false,
+      snippetTripleQuoteBlock: DEFAULT_SNIPPET_OPTIONS.snippetTripleQuoteBlock
     };
     await save(defaults);
     render(defaults);

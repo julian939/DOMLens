@@ -64,6 +64,45 @@
       </section>
 
       <section class="card">
+        <h2>Scroll Navigation</h2>
+        <p class="hint">
+          While inspecting, lock page scrolling and use the scroll wheel to walk
+          up to parent elements along the inspect chain.
+        </p>
+
+        <label class="field snapshot-toggle">
+          <input type="checkbox" id="scroll-navigation" />
+          <span>
+            Scroll to navigate nested elements
+            <span class="field-sub">
+              Page scrolling is locked during Inspect Mode; scroll up to select
+              a parent, scroll down to return to the element under the cursor.
+            </span>
+          </span>
+        </label>
+      </section>
+
+      <section class="card">
+        <h2>Snippet options</h2>
+        <p class="hint">
+          Configure the element snippet copied on a tap of the action key.
+        </p>
+
+        <label class="field snapshot-toggle">
+          <input type="checkbox" id="snippet-triple-quote" />
+          <span>
+            Wrap snippet in triple-quote block
+            <span class="field-sub">
+              When enabled, the copied snippet is fenced with <code>"""</code>
+              delimiters on their own lines for pasting into prompts. When
+              disabled, the raw HTML line is copied instead (full text is still
+              included).
+            </span>
+          </span>
+        </label>
+      </section>
+
+      <section class="card">
         <h2>Snapshot options</h2>
         <p class="hint">
           Configure what the full snapshot (hold action key for 300 ms) includes.

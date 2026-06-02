@@ -3,7 +3,8 @@
     { id: "box",        label: "Box" },
     { id: "layout",     label: "Layout" },
     { id: "colors",     label: "Colors" },
-    { id: "typography", label: "Typography" }
+    { id: "typography", label: "Typography" },
+    { id: "content",    label: "Content" }
   ];
 
   function rect(el) {
@@ -158,6 +159,18 @@
     {
       id: "textAlign", group: "typography", label: "Text-align", defaultEnabled: false,
       getValue: (_el, cs) => ({ kind: "text", text: cs.textAlign })
+    },
+
+    // CONTENT
+    {
+      id: "text", group: "content", label: "Text", defaultEnabled: true,
+      getValue: (el) => {
+        const copy = globalThis.ElementCopy;
+        if (!copy || typeof copy.getDisplayText !== 'function') return null;
+        const text = copy.getDisplayText(el);
+        if (!text) return null;
+        return { kind: "content", text };
+      }
     }
   ];
 

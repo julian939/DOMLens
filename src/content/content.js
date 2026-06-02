@@ -6,6 +6,13 @@
     Shift: (e) => e.shiftKey
   };
 
+  const WHEEL_STEP_THRESHOLD = 50;
+  const WHEEL_COOLDOWN_MS = 80;
+  const WHEEL_PANEL_DEBOUNCE_MS = 100;
+
+  const inspectCache = new WeakMap();
+  let inspectCacheGeneration = 0;
+
   const state = {
     settings: null,
     enabled: false,
@@ -29,7 +36,12 @@
        press it again. Cleared on any observed Hotkey keyup (including the
        implicit release on tab switch, window blur, or deactivate). Cancels
        do not engage the latch. See docs/adr/0004-commit-exits-inspect-mode.md */
-    captureLatched: false
+    captureLatched: false,
+    scrollNavigator: null,
+    wheelState: { accum: 0, lastStepAt: 0 },
+    pendingPanelEl: null,
+    panelDebounceTimer: 0,
+    panelSettingsKey: ''
   };
 
   /* Track pressed non-modifier keys so we can detect "is hotkey held" */
@@ -37,6 +49,7 @@
 
   function init() {
     globalThis.Overlay.init();
+    state.scrollNavigator = globalThis.ScrollNavigator.createNavigator();
     setupDispatcher();
     attachWindowLifecycle();
     attachKeyListeners();
@@ -77,7 +90,47 @@
   function applySettings(settings) {
     state.settings = settings;
     state.enabled = !!(settings.hotkey && settings.hotkey.code);
+    state.panelSettingsKey = panelSettingsKey(settings);
+    inspectCacheGeneration += 1;
     if (!state.enabled) deactivate();
+  }
+
+  function panelSettingsKey(settings) {
+    if (!settings) return '';
+    return JSON.stringify({
+      infoFields: settings.infoFields || {},
+      snippetTripleQuoteBlock: settings.snippetTripleQuoteBlock
+    });
+  }
+
+  function getCachedStyle(el) {
+    const key = state.panelSettingsKey;
+    let entry = inspectCache.get(el);
+    if (entry && entry.gen === inspectCacheGeneration && entry.styleKey === key && entry.cs) {
+      return entry.cs;
+    }
+    const cs = getComputedStyle(el);
+    if (!entry) entry = {};
+    entry.cs = cs;
+    entry.styleKey = key;
+    entry.gen = inspectCacheGeneration;
+    inspectCache.set(el, entry);
+    return cs;
+  }
+
+  function getCachedPanelHtml(el, cs) {
+    const key = state.panelSettingsKey;
+    let entry = inspectCache.get(el);
+    if (entry && entry.gen === inspectCacheGeneration && entry.styleKey === key && entry.panelHtml) {
+      return entry.panelHtml;
+    }
+    const panelHtml = buildPanelHtml(el, cs);
+    if (!entry) entry = {};
+    entry.panelHtml = panelHtml;
+    entry.styleKey = key;
+    entry.gen = inspectCacheGeneration;
+    inspectCache.set(el, entry);
+    return panelHtml;
   }
 
   function attachWindowLifecycle() {
@@ -126,8 +179,27 @@
     return pressedKeys.has(hotkey.code);
   }
 
+  function scrollNavigationActive() {
+    return !!(state.active
+      && state.settings
+      && state.settings.scrollNavigation);
+  }
+
+  function isPageScrollKey(event) {
+    const key = event.key;
+    if (key === ' ' || key === 'Spacebar') return true;
+    if (key === 'PageUp' || key === 'PageDown') return true;
+    if (key === 'Home' || key === 'End') return true;
+    return false;
+  }
+
   function onKeyDown(event) {
     if (!state.enabled) return;
+
+    if (scrollNavigationActive() && isPageScrollKey(event)) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
 
     /* Esc during a hold cancels the gesture. Handled before hotkey checks
        so it works regardless of whether the hotkey is currently held. */
@@ -154,6 +226,8 @@
   }
 
   function acquireTarget() {
+    const selected = state.scrollNavigator && state.scrollNavigator.current();
+    if (selected) return selected;
     if (state.target) return state.target;
     const fromPoint = document.elementFromPoint(state.cursor.x, state.cursor.y);
     if (fromPoint && !globalThis.Overlay.isOwnNode(fromPoint)) return fromPoint;
@@ -314,6 +388,9 @@
     if (state.captureLatched) return;
     if (state.active) return;
     state.active = true;
+    if (state.scrollNavigator) state.scrollNavigator.reset();
+    state.wheelState = { accum: 0, lastStepAt: 0 };
+    cancelDeferredPanelUpdate();
     attachInspectListeners();
   }
 
@@ -327,6 +404,9 @@
     }
     state.active = false;
     state.lifecycleLock = false;
+    if (state.scrollNavigator) state.scrollNavigator.reset();
+    state.wheelState = { accum: 0, lastStepAt: 0 };
+    cancelDeferredPanelUpdate();
     detachInspectListeners();
     state.target = null;
     state.cachedStyle = null;
@@ -339,22 +419,66 @@
     if (state.listenersAttached) return;
     state.listenersAttached = true;
     window.addEventListener('mousemove', onMouseMove, { capture: true, passive: true });
-    window.addEventListener('scroll', scheduleRender, { capture: true, passive: true });
-    window.addEventListener('resize', scheduleRender, { passive: true });
+    window.addEventListener('wheel', onWheel, { capture: true, passive: false });
+    window.addEventListener('scroll', onInspectScroll, { capture: true, passive: true });
+    window.addEventListener('resize', onInspectResize, { passive: true });
   }
 
   function detachInspectListeners() {
     if (!state.listenersAttached) return;
     state.listenersAttached = false;
     window.removeEventListener('mousemove', onMouseMove, { capture: true });
-    window.removeEventListener('scroll', scheduleRender, { capture: true });
-    window.removeEventListener('resize', scheduleRender);
+    window.removeEventListener('wheel', onWheel, { capture: true });
+    window.removeEventListener('scroll', onInspectScroll, { capture: true });
+    window.removeEventListener('resize', onInspectResize);
+  }
+
+  function onInspectScroll() {
+    if (state.lifecycleLock || !state.target || !state.cachedStyle) {
+      scheduleRender();
+      return;
+    }
+    globalThis.Overlay.updateHighlight(state.target, state.cachedStyle);
+    globalThis.Overlay.repositionPanel(state.cursor);
+  }
+
+  function onInspectResize() {
+    if (state.lifecycleLock || !state.target || !state.cachedStyle) {
+      scheduleRender();
+      return;
+    }
+    globalThis.Overlay.updateHighlight(state.target, state.cachedStyle);
+    globalThis.Overlay.repositionPanel(state.cursor);
+  }
+
+  function onWheel(event) {
+    if (!scrollNavigationActive()) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (state.lifecycleLock) return;
+
+    const result = globalThis.WheelStep.accumulateWheel(
+      event.deltaY,
+      state.wheelState,
+      WHEEL_STEP_THRESHOLD,
+      WHEEL_COOLDOWN_MS,
+      Date.now()
+    );
+    state.wheelState = result.state;
+    if (!result.steps || !state.scrollNavigator) return;
+
+    const direction = result.steps > 0 ? -1 : 1;
+    if (state.scrollNavigator.step(direction)) {
+      const el = state.scrollNavigator.current();
+      if (el) paintWheelTarget(el);
+    }
   }
 
   function onMouseMove(event) {
     state.cursor.x = event.clientX;
     state.cursor.y = event.clientY;
     if (state.lifecycleLock) return;
+    if (state.pendingPanelEl) flushPendingPanelUpdate();
     scheduleRender();
   }
 
@@ -368,22 +492,78 @@
     });
   }
 
-  function render() {
-    const { x, y } = state.cursor;
-    const el = document.elementFromPoint(x, y);
-    if (!el || globalThis.Overlay.isOwnNode(el)) {
+  function cancelDeferredPanelUpdate() {
+    state.pendingPanelEl = null;
+    if (state.panelDebounceTimer) {
+      clearTimeout(state.panelDebounceTimer);
+      state.panelDebounceTimer = 0;
+    }
+  }
+
+  function scheduleDebouncedPanelUpdate(el) {
+    state.pendingPanelEl = el;
+    if (state.panelDebounceTimer) clearTimeout(state.panelDebounceTimer);
+    state.panelDebounceTimer = setTimeout(() => {
+      state.panelDebounceTimer = 0;
+      if (!state.active || state.pendingPanelEl !== state.target) return;
+      const panelHtml = getCachedPanelHtml(state.target, state.cachedStyle);
+      globalThis.Overlay.setPanelContent(panelHtml);
+      state.pendingPanelEl = null;
+    }, WHEEL_PANEL_DEBOUNCE_MS);
+  }
+
+  function flushPendingPanelUpdate() {
+    if (!state.pendingPanelEl || state.pendingPanelEl !== state.target) return;
+    if (state.panelDebounceTimer) {
+      clearTimeout(state.panelDebounceTimer);
+      state.panelDebounceTimer = 0;
+    }
+    const panelHtml = getCachedPanelHtml(state.target, state.cachedStyle);
+    globalThis.Overlay.setPanelContent(panelHtml);
+    state.pendingPanelEl = null;
+  }
+
+  function paintWheelTarget(el) {
+    state.target = el;
+    state.cachedStyle = getCachedStyle(el);
+    globalThis.Overlay.updateHighlight(el, state.cachedStyle);
+    scheduleDebouncedPanelUpdate(el);
+  }
+
+  function paintTarget(el) {
+    if (!el) {
+      cancelDeferredPanelUpdate();
       globalThis.Overlay.hide();
+      state.target = null;
       return;
     }
 
+    cancelDeferredPanelUpdate();
     const targetChanged = el !== state.target;
     if (targetChanged) {
       state.target = el;
-      state.cachedStyle = getComputedStyle(el);
+      state.cachedStyle = getCachedStyle(el);
+      const panelHtml = getCachedPanelHtml(el, state.cachedStyle);
+      globalThis.Overlay.showFor(el, state.cursor, panelHtml, state.cachedStyle);
+      return;
     }
 
-    const panelHtml = buildPanelHtml(el, state.cachedStyle);
-    globalThis.Overlay.showFor(el, state.cursor, panelHtml, state.cachedStyle);
+    globalThis.Overlay.updateHighlight(el, state.cachedStyle);
+    globalThis.Overlay.repositionPanel(state.cursor);
+  }
+
+  function render() {
+    const { x, y } = state.cursor;
+    const leaf = document.elementFromPoint(x, y);
+    if (!leaf || globalThis.Overlay.isOwnNode(leaf)) {
+      globalThis.Overlay.hide();
+      state.target = null;
+      return;
+    }
+
+    if (state.scrollNavigator) state.scrollNavigator.setLeaf(leaf);
+    const el = (state.scrollNavigator && state.scrollNavigator.current()) || leaf;
+    paintTarget(el);
   }
 
   function buildPanelHtml(el, cs) {
@@ -405,8 +585,18 @@
     const registry = (globalThis.InfoFields && globalThis.InfoFields.REGISTRY) || [];
     const groups = (globalThis.InfoFields && globalThis.InfoFields.GROUPS) || [];
 
+    let textHtml = '';
+    const textField = registry.find((f) => f.id === 'text');
+    if (textField && enabled.text) {
+      const textResult = safeGetValue(textField, el, cs);
+      if (textResult) {
+        textHtml = renderFieldRow(textField.label, textResult);
+      }
+    }
+
     const rowsByGroup = new Map();
     for (const field of registry) {
+      if (field.id === 'text') continue;
       if (!enabled[field.id]) continue;
       const result = safeGetValue(field, el, cs);
       if (!result) continue;
@@ -418,6 +608,7 @@
 
     let firstGroup = true;
     let groupsHtml = '';
+    if (textHtml) firstGroup = false;
     for (const group of groups) {
       const rows = rowsByGroup.get(group.id);
       if (!rows || !rows.length) continue;
@@ -426,7 +617,8 @@
       firstGroup = false;
     }
 
-    return selectorHtml + groupsHtml;
+    const textBlock = textHtml ? `<div class="fields">${textHtml}</div>` : '';
+    return selectorHtml + textBlock + groupsHtml;
   }
 
   function safeGetValue(field, el, cs) {
@@ -441,6 +633,9 @@
     if (!value) return '';
     const text = value.text == null ? '' : String(value.text);
     if (!text) return '';
+    if (value.kind === 'content') {
+      return `<div class="content-row"><span class="content-label">${escapeHtml(label)}</span><div class="content-value">${escapeHtml(text)}</div></div>`;
+    }
     let valueHtml;
     if (value.kind === 'color') {
       valueHtml = renderSwatch(value.color) + escapeHtml(text);
@@ -465,7 +660,8 @@
   function onCopyShortcut(target) {
     const el = target || state.target;
     if (!el) return;
-    const line = globalThis.ElementCopy.buildSnippet(el);
+    const wrapTripleQuote = !state.settings || state.settings.snippetTripleQuoteBlock !== false;
+    const line = globalThis.ElementCopy.buildSnippet(el, { snippetTripleQuoteBlock: wrapTripleQuote });
     writeClipboard(line);
     globalThis.Overlay.captureRing.pop();
     globalThis.Overlay.showToast('Copied!', el.getBoundingClientRect());

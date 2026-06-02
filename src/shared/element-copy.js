@@ -111,11 +111,25 @@
     return out.replace(/\s+/g, ' ').trim();
   }
 
-  function getSnippetText(el) {
+  function extractElementText(el) {
+    if (!el) return '';
     const own = getElementOwnText(el);
-    if (own) return truncateAtWordBoundary(own, SNIPPET_TEXT_MAX_LEN);
-    const full = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
-    return truncateAtWordBoundary(full, SNIPPET_TEXT_MAX_LEN);
+    if (own) return own;
+    return (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function getDisplayText(el, maxLen) {
+    const text = extractElementText(el);
+    if (!text) return null;
+    return truncateAtWordBoundary(text, maxLen == null ? SNIPPET_TEXT_MAX_LEN : maxLen);
+  }
+
+  function getSnippetText(el) {
+    return extractElementText(el);
+  }
+
+  function wrapSnippetBlock(snippet) {
+    return `"""\n${snippet}\n"""`;
   }
 
   function collectSnippetAttrs(el) {
@@ -167,10 +181,13 @@
     return segments.join(' > ');
   }
 
-  function buildSnippet(el) {
+  function buildSnippet(el, options) {
     if (!el || el.nodeType !== 1) return '';
-    if (el === document.documentElement) return '<html>';
-    if (el === document.body) return '<body>';
+    const wrapBlock = !options || options.snippetTripleQuoteBlock !== false;
+    const finish = wrapBlock ? wrapSnippetBlock : (s) => s;
+
+    if (el === document.documentElement) return finish('<html>');
+    if (el === document.body) return finish('<body>');
 
     const tag = el.tagName.toLowerCase();
     const attrs = collectSnippetAttrs(el);
@@ -193,7 +210,7 @@
       const breadcrumb = buildParentBreadcrumb(el);
       if (breadcrumb) snippet += `  ← in ${breadcrumb}`;
     }
-    return snippet;
+    return finish(snippet);
   }
 
   function idSelector(el) {
@@ -396,11 +413,23 @@
     return JSON.stringify(snapshot);
   }
 
-  globalThis.ElementCopy = {
+  const api = {
     buildSnippet,
     buildSnapshot,
     buildSnapshotSansScreenshot,
     boxFromRect,
-    requestViewportCapture
+    requestViewportCapture,
+    extractElementText,
+    getDisplayText,
+    getElementOwnText,
+    truncateAtWordBoundary,
+    SNIPPET_TEXT_MAX_LEN,
+    SNIPPET_HREF_MAX_LEN
   };
+
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = api;
+  } else {
+    globalThis.ElementCopy = api;
+  }
 })();

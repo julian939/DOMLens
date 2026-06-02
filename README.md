@@ -34,18 +34,23 @@ Hold your hotkey (default: **Left Alt**) and move the mouse. A floating info pan
 
 ![Info panel close-up](./assets/screenshots/info-panel.png)
 
-### 20 Configurable Info Fields
+### 21 Configurable Info Fields
 
-The panel shows element properties across four categories. Every field can be toggled in the options page.
+The panel shows element properties across five categories. Every field can be toggled in the options page.
 
 | Group          | Fields                                                          |
 | -------------- | --------------------------------------------------------------- |
+| **Text**       | Visible element text (truncated in the panel; shown first)    |
 | **Box**        | Dimensions, Coordinates, Margin, Padding, Border, Border-radius |
 | **Layout**     | Display, Position, Z-index, Overflow, Opacity, Cursor           |
 | **Colors**     | Color (with swatch), Background (with swatch), Box-shadow       |
 | **Typography** | Font, Size, Weight, Line-height, Letter-spacing, Text-align     |
 
-Seven fields are on by default; the rest are one click away.
+Eight fields are on by default (including **Text** at the top of the panel); the rest are one click away.
+
+### Scroll Navigation (optional)
+
+In the options page, enable **Scroll to navigate nested elements**. While Inspect Mode is active, page scrolling is locked and the scroll wheel walks the selection up the **inspect chain** — from the element under your cursor to its parent, grandparent, and so on up to `<body>`. Scroll back down to return toward the leaf. Point at a different element to reset. Off by default.
 
 ### CSS Box Model Visualization
 
@@ -62,13 +67,15 @@ Only non-zero layers are drawn, so you immediately _see_ the spacing instead of 
 
 While holding the hotkey, press the **action key** (default: **C**) to copy. How long you press determines what you get:
 
-**Tap → Element Snippet** (compact, single-line HTML)
+**Tap → Element Snippet** (compact HTML, optionally in a `"""` block)
 
 ```html
+"""
 <button data-testid="submit-btn" class="btn-primary">Submit form</button>
+"""
 ```
 
-A quick reference for Slack messages, bug reports, or short prompts. DOMLens strips utility classes (Tailwind, CSS modules, Emotion hashes) and keeps only the attributes that identify the element: `id`, `data-testid`, `aria-label`, `role`, and similar.
+A quick reference for Slack messages, bug reports, or LLM prompts. DOMLens strips utility classes (Tailwind, CSS modules, Emotion hashes), keeps identifying attributes (`id`, `data-testid`, `aria-label`, `role`, and similar), and includes the element's full visible text. Enable **Wrap snippet in triple-quote block** in the options page to fence the output with `"""` delimiters; disable it for a single-line HTML copy.
 
 **Hold (300 ms) → Element Snapshot** (full structured JSON)
 
@@ -104,7 +111,9 @@ Click the DOMLens toolbar icon to open the options page. From there you can:
 
 - **Set the hotkey** — click the recorder, press the key you want (Left Alt, Ctrl, Cmd, Shift, or any letter/number)
 - **Set the action key** — same interaction
-- **Toggle info fields** — checkboxes grouped by category, saved instantly
+- **Toggle info fields** — checkboxes grouped by category (**Text** appears first), saved instantly
+- **Snippet options** — wrap copied snippets in a triple-quote block (on by default)
+- **Scroll Navigation** — lock page scroll during Inspect Mode and use the wheel to select parent elements
 - **Reset to defaults** — one click restores the original setup
 
 Settings sync across your Chrome profile via `chrome.storage.sync`.

@@ -8,6 +8,10 @@ A Chrome extension that lets users hold a hotkey and hover any element on a webp
 The active state entered while the [[hotkey]] is held — the extension tracks the element under the cursor, draws [[highlight-layers]], and shows the [[info-panel]]. Exits immediately on hotkey release, tab switch, window blur, or on a successful commit of an [[element-snippet]] or [[element-snapshot]] — the latter engages the [[capture-latch]], which blocks re-entry until the [[hotkey]] is released and pressed again.
 _Avoid_: Peek mode, hover mode, inspection state
 
+**Scroll Navigation**:
+An optional [[inspect-mode]] behavior, off by default and toggled in the Options page. When enabled, page scrolling is locked for the whole duration of [[inspect-mode]] and the scroll wheel instead walks the inspected element along the **inspect chain** — the ancestor chain running from the element under the cursor (the _leaf_) up to `<body>`. The selection anchors at the leaf; scrolling up steps toward the root (parent, grandparent, …), scrolling back down returns toward the leaf, and both ends are hard-clamped (no page scroll leaks through). Moving the cursor onto a different leaf resets the selection to that new leaf at depth 0. While the toggle is off there is no scroll lock — scrolling pans the page as before and the inspected element is always the leaf under the cursor. The element selected this way is the one the [[info-panel]], [[highlight-layers]], and any [[element-snippet]] / [[element-snapshot]] capture operate on. Wheel depth changes update [[highlight-layers]] immediately; [[info-panel]] content is debounced and cached per element so rapid scrolling stays on the compositor thread (`translate3d`, CSS `contain`) without rebuilding panel HTML every tick.
+_Avoid_: Scroll lock, depth scrubbing, tree navigation, parent picker, ancestor walk
+
 **Action Key**:
 The key pressed in combination with the [[hotkey]] while in [[inspect-mode]] to capture the current element. A short tap (press and release within the [[hold-gesture]] threshold) produces an [[element-snippet]]; a [[hold-gesture]] produces an [[element-snapshot]].
 _Avoid_: Capture key, trigger key, copy key
@@ -33,8 +37,8 @@ The four semi-transparent overlays drawn over the hovered element while in [[ins
 _Avoid_: Box model overlay, highlight, outline
 
 **Element Snippet**:
-The single-line, HTML-like representation of an element produced by a tap of the [[action-key]] while inspecting — includes the tag, curated attributes (id, data-testid, aria-label, etc.), and optionally a parent breadcrumb. Confirmed by the [[capture-ring]] popping in the full Gemini gradient (static — no rotation) and a "Copied!" [[capture-toast]] at the cursor. Optimized for pasting into a chat or prompt.
-_Avoid_: Quick copy, short copy
+The HTML-like representation of an element produced by a tap of the [[action-key]] while inspecting — includes the tag, curated attributes (id, data-testid, aria-label, etc.), the element's full visible text (whitespace collapsed), and optionally a parent breadcrumb. By default the whole string is wrapped in a triple-quote (`"""`) block with delimiters on their own lines so it pastes as a clearly bounded prompt fragment; the Options page toggle **Wrap snippet in triple-quote block** disables the fence and copies the raw HTML line instead (full text is still included). Confirmed by the [[capture-ring]] popping in the full Gemini gradient (static — no rotation) and a "Copied!" [[capture-toast]] at the cursor. Optimized for pasting into a chat or prompt.
+_Avoid_: Quick copy, short copy, single-line snippet
 
 **Element Snapshot**:
 The full JSON document produced by a [[hold-gesture]] of the [[action-key]] while inspecting — contains everything an AI agent needs to visually reconstruct the element: selector, box dimensions, outerHTML, full computed styles (filtered against UA defaults, recursively for all descendants, including `::before` / `::after`), referenced asset metadata (fonts, image URLs, CSS custom properties), and a base64-encoded PNG screenshot of the element cropped from the visible tab. Confirmed by a [[capture-scan]] on the [[capture-ring]] and a "Snapshot Copied!" [[capture-toast]] at the cursor at the moment of commit.

@@ -83,10 +83,13 @@
         all: initial;
         visibility: inherit;
         position: fixed;
+        top: 0;
+        left: 0;
         pointer-events: none;
         display: none;
         box-sizing: border-box;
-        will-change: transform, width, height;
+        contain: layout style paint;
+        will-change: transform;
       }
       .margin   { background: ${HIGHLIGHT_COLORS.margin}; }
       .border   { background: ${HIGHLIGHT_COLORS.border}; }
@@ -99,6 +102,8 @@
         all: initial;
         visibility: inherit;
         position: fixed;
+        top: 0;
+        left: 0;
         pointer-events: none;
         display: none;
         box-sizing: border-box;
@@ -113,6 +118,8 @@
         border-radius: 6px;
         box-shadow: 0 6px 24px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.4);
         overflow: hidden;
+        contain: layout style paint;
+        will-change: transform;
       }
       .panel * { box-sizing: border-box; }
       .selector {
@@ -152,6 +159,22 @@
         margin-top: 8px;
         padding-top: 8px;
         border-top: 1px solid rgba(255,255,255,0.08);
+      }
+      .content-row {
+        margin-top: 6px;
+      }
+      .content-label {
+        display: block;
+        color: #9ba1a8;
+        font-size: 11px;
+        margin-bottom: 2px;
+      }
+      .content-value {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+        color: #f0f0f0;
+        font-size: 12px;
+        line-height: 1.4;
+        word-break: break-word;
       }
 
       .capture-ring {
@@ -303,14 +326,17 @@
       return;
     }
     el.style.display = 'block';
-    el.style.top = `${rect.top}px`;
-    el.style.left = `${rect.left}px`;
+    el.style.transform = `translate3d(${rect.left}px, ${rect.top}px, 0)`;
     el.style.width = `${rect.width}px`;
     el.style.height = `${rect.height}px`;
   }
 
   function renderHighlight(el, cs) {
     const rect = el.getBoundingClientRect();
+    renderHighlightFromRect(rect, cs);
+  }
+
+  function renderHighlightFromRect(rect, cs) {
 
     const margin = {
       top: parseFloat(cs.marginTop) || 0,
@@ -381,21 +407,39 @@
     return { left, top };
   }
 
+  function positionPanel(cursor) {
+    const rect = panel.getBoundingClientRect();
+    const { left, top } = clampToViewport(cursor, rect.width, rect.height, false);
+    panel.style.transform = `translate3d(${left}px, ${top}px, 0)`;
+  }
+
   function showPanel(panelHtml, cursor) {
     panel.innerHTML = panelHtml;
     panel.style.display = 'block';
-    panel.style.left = '0px';
-    panel.style.top = '0px';
-    const rect = panel.getBoundingClientRect();
-    const { left, top } = clampToViewport(cursor, rect.width, rect.height, false);
-    panel.style.left = `${left}px`;
-    panel.style.top = `${top}px`;
+    panel.style.transform = 'translate3d(0px, 0px, 0)';
+    positionPanel(cursor);
+  }
+
+  function setPanelContent(panelHtml) {
+    if (!panel) return;
+    panel.innerHTML = panelHtml;
+    if (panel.style.display === 'none') panel.style.display = 'block';
   }
 
   function showFor(el, cursor, panelHtml, cs) {
     renderHighlight(el, cs);
     showPanel(panelHtml, cursor);
     show();
+  }
+
+  function updateHighlight(el, cs) {
+    renderHighlight(el, cs);
+    show();
+  }
+
+  function repositionPanel(cursor) {
+    if (!panel || panel.style.display === 'none') return;
+    positionPanel(cursor);
   }
 
   /* Hide/show via the shadow-host's visibility so the layout tree stays put.
@@ -698,6 +742,9 @@
     init,
     isOwnNode,
     showFor,
+    updateHighlight,
+    setPanelContent,
+    repositionPanel,
     hide,
     show,
     hidePanel,
