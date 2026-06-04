@@ -77,9 +77,9 @@ While holding the hotkey, press the **action key** (default: **C**) to copy. How
 
 A quick reference for Slack messages, bug reports, or LLM prompts. DOMLens strips utility classes (Tailwind, CSS modules, Emotion hashes), keeps identifying attributes (`id`, `data-testid`, `aria-label`, `role`, and similar), and includes the element's full visible text. Enable **Wrap snippet in triple-quote block** in the options page to fence the output with `"""` delimiters; disable it for a single-line HTML copy.
 
-**Hold (300 ms) → Element Snapshot** (full structured JSON)
+**Hold (≥ 1.3 s) → Element Snapshot** (full structured JSON)
 
-A progress indicator fills while you hold; release before 300 ms and you get the snippet instead. Press `Esc`, release the hotkey, or switch tabs to cancel.
+The Capture Ring charges around the element as you hold. Release within the first 300 ms and you get the Snippet; hold past ~1.3 s to commit a Snapshot; release in the gap between (the *dead zone*) cancels silently with no copy. Press `Esc`, release the hotkey, or switch tabs to cancel at any point.
 
 ```json
 {

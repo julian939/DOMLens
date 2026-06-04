@@ -8,26 +8,28 @@
   };
 
   const TOAST_DURATION_MS = 1200;
-  const CAPTURE_POP_MS = 1200;
-  const CAPTURE_FADE_MS = 280;
-  const CAPTURE_SCAN_MS = 1200;
-  const CAPTURE_CHARGE_MS = 1000;
-  const CAPTURE_BAND_MIN_PX = 2;
-  const CAPTURE_BAND_MAX_PX = 4;
-  const CAPTURE_BAND_FACTOR = 0.02;
-  const CAPTURE_INNER_EDGE_PX = 1;
-  const CAPTURE_SCAN_GLOW = '0 0 0 1px rgba(124, 58, 237, 0.4), 0 0 16px 3px rgba(219, 39, 119, 0.5), 0 0 36px 8px rgba(59, 130, 246, 0.4)';
 
-  const GEMINI_GRADIENT_STOPS = '#1E40AF, #3B82F6, #7C3AED, #DB2777, #F59E0B, #1E40AF';
+  /* The Capture Ring owns its own animation timing, band sizing, and gradient
+     (see capture-ring.js / ADR 0004). Overlay re-exports the timings for
+     backward compat and borrows the gradient for the Capture Toast's border. */
+  const Ring = globalThis.CaptureRing;
+  const CAPTURE_POP_MS = Ring.POP_MS;
+  const CAPTURE_FADE_MS = Ring.FADE_MS;
+  const CAPTURE_SCAN_MS = Ring.SCAN_MS;
+  const CAPTURE_CHARGE_MS = Ring.CHARGE_MS;
+
+  const GEMINI_GRADIENT_STOPS = Ring.GRADIENT_STOPS;
 
   let host = null;
   let shadow = null;
   let layers = null;
   let panel = null;
   let toast = null;
-  let captureRingEl = null;
-  let captureHideTimeoutId = 0;
   let toastTimeoutId = 0;
+
+  /* The Capture Ring lives in its own module; Overlay holds its instance and
+     delegates, flipping host visibility before each show. */
+  let ringApi = null;
 
   /* Locked-target mode keeps Highlight Layers glued to a single element.
      Only re-renders on scroll/resize, not every RAF tick. */
@@ -35,11 +37,6 @@
   let lockedCs = null;
   let lockedRafId = 0;
   let lockedDirty = false;
-
-  /* Capture Layer placement follows its own target. */
-  let captureTarget = null;
-  let captureRafId = 0;
-  let captureDirty = false;
 
   function createLayer(cls) {
     const el = document.createElement('div');
@@ -49,14 +46,6 @@
 
   function init() {
     if (host) return;
-    try {
-      CSS.registerProperty({
-        name: '--domlens-scan-angle',
-        syntax: '<angle>',
-        initialValue: '0deg',
-        inherits: false
-      });
-    } catch (_) {}
     host = document.createElement('div');
     host.setAttribute('data-web-element-inspector', '');
     Object.assign(host.style, {
@@ -74,11 +63,6 @@
 
     const style = document.createElement('style');
     style.textContent = `
-      @property --domlens-scan-angle {
-        syntax: '<angle>';
-        initial-value: 0deg;
-        inherits: false;
-      }
       .layer {
         all: initial;
         visibility: inherit;
@@ -177,76 +161,6 @@
         word-break: break-word;
       }
 
-      .capture-ring {
-        all: initial;
-        visibility: inherit;
-        position: fixed;
-        pointer-events: none;
-        display: none;
-        box-sizing: border-box;
-        padding: var(--domlens-band, ${CAPTURE_BAND_MAX_PX}px);
-        opacity: 0;
-        -webkit-mask:
-          linear-gradient(#000, #000) content-box,
-          linear-gradient(#000, #000);
-        -webkit-mask-composite: xor;
-                mask:
-          linear-gradient(#000, #000) content-box,
-          linear-gradient(#000, #000);
-        mask-composite: exclude;
-      }
-      .capture-ring::before {
-        content: '';
-        position: absolute;
-        box-sizing: border-box;
-        inset: var(--domlens-band, ${CAPTURE_BAND_MAX_PX}px);
-        border-radius: var(--domlens-inner-radius, 0);
-        box-shadow: 0 0 0 ${CAPTURE_INNER_EDGE_PX}px rgba(20, 20, 28, 0.95);
-        pointer-events: none;
-      }
-      .capture-ring.visible { display: block; }
-      .capture-ring.active {
-        opacity: 1;
-        background: conic-gradient(from 0deg, ${GEMINI_GRADIENT_STOPS});
-      }
-      .capture-ring.popping {
-        background: conic-gradient(from 0deg, ${GEMINI_GRADIENT_STOPS});
-        animation: domlens-capture-pop ${CAPTURE_POP_MS}ms ease-out 1 forwards;
-      }
-      .capture-ring.charging {
-        opacity: 1;
-        background: conic-gradient(from var(--domlens-scan-angle), ${GEMINI_GRADIENT_STOPS});
-        animation: domlens-capture-charge ${CAPTURE_CHARGE_MS}ms linear 1 forwards;
-      }
-      .capture-ring.scanning {
-        opacity: 1;
-        background: conic-gradient(from var(--domlens-scan-angle), ${GEMINI_GRADIENT_STOPS});
-        box-shadow: ${CAPTURE_SCAN_GLOW};
-        animation: domlens-capture-scan ${CAPTURE_SCAN_MS}ms linear 1 forwards;
-      }
-      .capture-ring.fading {
-        background: conic-gradient(from var(--domlens-scan-angle), ${GEMINI_GRADIENT_STOPS});
-        animation: domlens-capture-fade ${CAPTURE_FADE_MS}ms ease-out 1 forwards;
-      }
-      @keyframes domlens-capture-fade {
-        0%   { opacity: 1; }
-        100% { opacity: 0; }
-      }
-      @keyframes domlens-capture-pop {
-        0%   { opacity: 1; }
-        85%  { opacity: 1; }
-        100% { opacity: 0; }
-      }
-      @keyframes domlens-capture-charge {
-        0%   { --domlens-scan-angle:   0deg; opacity: 1; }
-        100% { --domlens-scan-angle: 360deg; opacity: 1; }
-      }
-      @keyframes domlens-capture-scan {
-        0%   { --domlens-scan-angle: 360deg; opacity: 1; }
-        85%  { --domlens-scan-angle: 720deg; opacity: 1; }
-        100% { --domlens-scan-angle: 720deg; opacity: 0; }
-      }
-
       .toast {
         all: initial;
         visibility: inherit;
@@ -288,9 +202,10 @@
     };
     Object.values(layers).forEach((el) => shadow.appendChild(el));
 
-    captureRingEl = document.createElement('div');
-    captureRingEl.className = 'capture-ring';
-    shadow.appendChild(captureRingEl);
+    /* The ring mounts itself into the shared Shadow root (its own <style> and
+       element), between the Highlight Layers and the Panel for correct paint
+       order. */
+    ringApi = globalThis.CaptureRing.createRing(shadow);
 
     panel = document.createElement('div');
     panel.className = 'panel';
@@ -481,9 +396,7 @@
 
   function markLockedDirty() {
     lockedDirty = true;
-    captureDirty = true;
     if (lockedTarget && !lockedRafId) scheduleLockedFrame();
-    if (captureTarget && !captureRafId) scheduleCaptureFrame();
   }
 
   function scheduleLockedFrame() {
@@ -498,175 +411,6 @@
         exitLockedTargetMode();
       }
     });
-  }
-
-  /* --- Capture Ring -------------------------------------------------- */
-
-  function parseRadiusValue(val, refSize) {
-    const raw = (val || '').trim().split(/\s+/)[0];
-    if (raw.endsWith('%')) return (parseFloat(raw) / 100) * refSize;
-    return parseFloat(raw) || 0;
-  }
-
-  function computeBandWidth(rect) {
-    const size = (rect.width + rect.height) / 2;
-    return Math.max(
-      CAPTURE_BAND_MIN_PX,
-      Math.min(size * CAPTURE_BAND_FACTOR, CAPTURE_BAND_MAX_PX)
-    );
-  }
-
-  function placeCaptureRingToRect(rect, el) {
-    if (rect.width <= 0 || rect.height <= 0) {
-      captureRingEl.style.display = 'none';
-      return;
-    }
-    const pad = computeBandWidth(rect);
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-
-    let tl = 0, tr = 0, br = 0, bl = 0;
-    if (el) {
-      try {
-        const cs = getComputedStyle(el);
-        tl = parseRadiusValue(cs.borderTopLeftRadius, rect.width);
-        tr = parseRadiusValue(cs.borderTopRightRadius, rect.width);
-        br = parseRadiusValue(cs.borderBottomRightRadius, rect.width);
-        bl = parseRadiusValue(cs.borderBottomLeftRadius, rect.width);
-      } catch (_) {}
-    }
-
-    const outsideClipped =
-      rect.top - pad < 0 ||
-      rect.left - pad < 0 ||
-      rect.right + pad > vw ||
-      rect.bottom + pad > vh;
-
-    captureRingEl.style.setProperty('--domlens-band', `${pad}px`);
-
-    if (outsideClipped) {
-      captureRingEl.style.top = `${rect.top}px`;
-      captureRingEl.style.left = `${rect.left}px`;
-      captureRingEl.style.width = `${rect.width}px`;
-      captureRingEl.style.height = `${rect.height}px`;
-      captureRingEl.style.borderRadius =
-        `${Math.max(0, tl - pad)}px ${Math.max(0, tr - pad)}px ${Math.max(0, br - pad)}px ${Math.max(0, bl - pad)}px`;
-      captureRingEl.style.setProperty(
-        '--domlens-inner-radius',
-        `${Math.max(0, tl - 2 * pad)}px ${Math.max(0, tr - 2 * pad)}px ${Math.max(0, br - 2 * pad)}px ${Math.max(0, bl - 2 * pad)}px`
-      );
-    } else {
-      captureRingEl.style.top = `${rect.top - pad}px`;
-      captureRingEl.style.left = `${rect.left - pad}px`;
-      captureRingEl.style.width = `${rect.width + pad * 2}px`;
-      captureRingEl.style.height = `${rect.height + pad * 2}px`;
-      captureRingEl.style.borderRadius =
-        `${tl ? tl + pad : 0}px ${tr ? tr + pad : 0}px ${br ? br + pad : 0}px ${bl ? bl + pad : 0}px`;
-      captureRingEl.style.setProperty(
-        '--domlens-inner-radius',
-        `${tl}px ${tr}px ${br}px ${bl}px`
-      );
-    }
-  }
-
-  function scheduleCaptureFrame() {
-    captureRafId = requestAnimationFrame(() => {
-      captureRafId = 0;
-      if (!captureTarget) return;
-      if (!captureDirty) return;
-      captureDirty = false;
-      try {
-        placeCaptureRingToRect(captureTarget.getBoundingClientRect(), captureTarget);
-      } catch (_) {
-        captureRingHide();
-      }
-    });
-  }
-
-  function captureRingShow(el) {
-    if (!captureRingEl || !el) return;
-    captureTarget = el;
-    if (captureHideTimeoutId) {
-      clearTimeout(captureHideTimeoutId);
-      captureHideTimeoutId = 0;
-    }
-    captureRingEl.classList.remove('popping', 'charging', 'scanning', 'fading');
-    captureRingEl.classList.add('visible', 'active');
-    show();
-    try {
-      placeCaptureRingToRect(el.getBoundingClientRect(), el);
-    } catch (_) {
-      captureRingHide();
-      return;
-    }
-    captureDirty = false;
-    if (captureRafId) cancelAnimationFrame(captureRafId);
-  }
-
-  function captureRingHide() {
-    if (!captureRingEl) return;
-    if (captureRafId) {
-      cancelAnimationFrame(captureRafId);
-      captureRafId = 0;
-    }
-    if (captureHideTimeoutId) {
-      clearTimeout(captureHideTimeoutId);
-      captureHideTimeoutId = 0;
-    }
-    captureTarget = null;
-    captureRingEl.classList.remove('visible', 'active', 'popping', 'charging', 'scanning');
-    captureRingEl.style.display = '';
-  }
-
-  function captureRingPop() {
-    if (!captureRingEl) return;
-    if (!captureRingEl.classList.contains('visible')) return;
-    /* Drop the steady-state active class so the pop animation's keyframes
-       fully own the visible ring; force a reflow so the animation restarts
-       cleanly even if .popping was just set on a previous capture. */
-    captureRingEl.classList.remove('active', 'charging', 'scanning', 'fading');
-    void captureRingEl.offsetWidth;
-    captureRingEl.classList.add('popping');
-    if (captureHideTimeoutId) clearTimeout(captureHideTimeoutId);
-    captureHideTimeoutId = setTimeout(() => {
-      captureHideTimeoutId = 0;
-      captureRingHide();
-    }, CAPTURE_POP_MS + 20);
-  }
-
-  function captureRingStartCharging(el) {
-    if (!captureRingEl) return;
-    if (!captureRingEl.classList.contains('visible')) captureRingShow(el);
-    captureRingEl.classList.remove('active', 'popping', 'scanning', 'fading');
-    void captureRingEl.offsetWidth;
-    captureRingEl.classList.add('charging');
-    if (captureHideTimeoutId) clearTimeout(captureHideTimeoutId);
-  }
-
-  function captureRingStartScan(el) {
-    if (!captureRingEl) return;
-    if (!captureRingEl.classList.contains('visible')) captureRingShow(el);
-    captureRingEl.classList.remove('active', 'charging', 'popping', 'fading');
-    void captureRingEl.offsetWidth;
-    captureRingEl.classList.add('scanning');
-    if (captureHideTimeoutId) clearTimeout(captureHideTimeoutId);
-    captureHideTimeoutId = setTimeout(() => {
-      captureHideTimeoutId = 0;
-      captureRingHide();
-    }, CAPTURE_SCAN_MS + 20);
-  }
-
-  function captureRingFadeFromCharging() {
-    if (!captureRingEl) return;
-    if (!captureRingEl.classList.contains('visible')) return;
-    captureRingEl.classList.remove('active', 'charging', 'scanning', 'popping');
-    void captureRingEl.offsetWidth;
-    captureRingEl.classList.add('fading');
-    if (captureHideTimeoutId) clearTimeout(captureHideTimeoutId);
-    captureHideTimeoutId = setTimeout(() => {
-      captureHideTimeoutId = 0;
-      captureRingHide();
-    }, CAPTURE_FADE_MS + 20);
   }
 
   function hidePanel() {
@@ -753,13 +497,20 @@
     hideToast,
     enterLockedTargetMode,
     exitLockedTargetMode,
+    /* Delegate to the Capture Ring module. Host visibility (the shared
+       visibility:hidden trick) stays Overlay's concern, so the show paths flip
+       it on before handing off. */
     captureRing: {
-      show: captureRingShow,
-      pop: captureRingPop,
-      startCharging: captureRingStartCharging,
-      startScan: captureRingStartScan,
-      fadeFromCharging: captureRingFadeFromCharging,
-      hide: captureRingHide
+      show: (el) => { show(); if (ringApi) ringApi.show(el); },
+      pop: () => { if (ringApi) ringApi.pop(); },
+      startCharging: (el) => { show(); if (ringApi) ringApi.startCharging(el); },
+      startScan: (el) => { show(); if (ringApi) ringApi.startScan(el); },
+      fadeFromCharging: () => { if (ringApi) ringApi.fadeFromCharging(); },
+      hide: () => { if (ringApi) ringApi.hide(); },
+      /* Durations the Capture Session reads to time the shared feedback window. */
+      POP_MS: CAPTURE_POP_MS,
+      SCAN_MS: CAPTURE_SCAN_MS,
+      FADE_MS: CAPTURE_FADE_MS
     },
     TOAST_DURATION_MS,
     CAPTURE_POP_MS,

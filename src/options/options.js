@@ -242,13 +242,7 @@
       `into a multi-colour scanner that sweeps around the element while the snapshot is captured.`;
   }
 
-  function escapeHtml(s) {
-    return String(s)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-  }
+  const escapeHtml = globalThis.EscapeHtml.escapeHtml;
 
   /* ── Persist ────────────────────────────────────────── */
 

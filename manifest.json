@@ -29,6 +29,7 @@
       "matches": ["<all_urls>"],
       "js": [
         "src/shared/settings.js",
+        "src/shared/escape-html.js",
         "src/shared/info-fields.js",
         "src/shared/computed-styles.js",
         "src/shared/asset-collector.js",
@@ -37,8 +38,13 @@
         "src/shared/scroll-navigator.js",
         "src/shared/wheel-step.js",
         "src/shared/element-copy.js",
+        "src/shared/info-panel.js",
         "src/shared/snapshot-pipeline.js",
+        "src/shared/ring-geometry.js",
+        "src/content/capture-ring.js",
         "src/content/overlay.js",
+        "src/shared/hotkey-matcher.js",
+        "src/shared/capture-session.js",
         "src/content/content.js"
       ],
       "run_at": "document_start",

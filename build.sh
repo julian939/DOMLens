@@ -4,6 +4,12 @@
 #
 # Produces ./domlens.zip in the project root, containing only the files
 # required by the extension at runtime.
+#
+# The runtime file list is derived directly from manifest.json (background
+# worker, content scripts, web-accessible resources, options page, icons) so
+# it can never drift out of sync with what the extension actually loads.
+# Files needed at runtime but NOT referenced by the manifest — e.g. CSS pulled
+# in by an HTML page — are listed explicitly in EXTRA_FILES below.
 
 set -euo pipefail
 
@@ -15,20 +21,31 @@ OUTPUT="domlens.zip"
 # Remove any previous artifact so we never ship stale files.
 rm -f "$OUTPUT"
 
-# Verify required files exist before packaging.
-required=(
-  "manifest.json"
-  "src/shared/settings.js"
-  "src/content/content.js"
-  "src/options/options.html"
-  "src/options/options.js"
+# Runtime files the manifest doesn't reference (options.css is loaded by
+# options.html via <link>, not the manifest), plus packaging extras.
+EXTRA_FILES=(
   "src/options/options.css"
-  "assets/icons/icon16.png"
-  "assets/icons/icon32.png"
-  "assets/icons/icon48.png"
-  "assets/icons/icon128.png"
+  "LICENSE"
 )
-for f in "${required[@]}"; do
+
+# Collect every path the manifest references. Guards (// empty, // []) keep the
+# query working even if an optional section is absent.
+MANIFEST_FILES=()
+while IFS= read -r f; do
+  MANIFEST_FILES+=("$f")
+done < <(jq -r '
+  ( [ .background.service_worker // empty ]
+  + [ (.content_scripts // [])[].js[] ]
+  + [ (.web_accessible_resources // [])[].resources[] ]
+  + [ .options_ui.page // empty ]
+  + [ (.icons // {})[] ]
+  ) | unique | .[]
+' manifest.json)
+
+FILES=( "manifest.json" "${MANIFEST_FILES[@]}" "${EXTRA_FILES[@]}" )
+
+# Verify required files exist before packaging.
+for f in "${FILES[@]}"; do
   if [[ ! -f "$f" ]]; then
     echo "ERROR: required file missing: $f" >&2
     exit 1
@@ -37,19 +54,7 @@ done
 
 # Build the zip with an explicit allowlist of paths — safer than relying on
 # excludes, because nothing extra can ever sneak in.
-zip -r -X "$OUTPUT" \
-  manifest.json \
-  src/shared/settings.js \
-  src/content/content.js \
-  src/options/options.html \
-  src/options/options.js \
-  src/options/options.css \
-  assets/icons/icon16.png \
-  assets/icons/icon32.png \
-  assets/icons/icon48.png \
-  assets/icons/icon128.png \
-  LICENSE \
-  > /dev/null
+zip -r -X "$OUTPUT" "${FILES[@]}" > /dev/null
 
 # Strip macOS metadata if any slipped in (defensive — -X above already skips it).
 zip -d "$OUTPUT" "__MACOSX*" "*/.DS_Store" ".DS_Store" 2>/dev/null || true

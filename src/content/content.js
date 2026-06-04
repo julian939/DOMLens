@@ -1,11 +1,4 @@
 (() => {
-  const MODIFIER_EVENT_MAP = {
-    Alt: (e) => e.altKey,
-    Control: (e) => e.ctrlKey,
-    Meta: (e) => e.metaKey,
-    Shift: (e) => e.shiftKey
-  };
-
   const WHEEL_STEP_THRESHOLD = 50;
   const WHEEL_COOLDOWN_MS = 80;
   const WHEEL_PANEL_DEBOUNCE_MS = 100;
@@ -22,11 +15,12 @@
     cachedStyle: null,
     rafScheduled: false,
     listenersAttached: false,
-    /* Gesture state — populated at actionKeyDown, cleared on any terminal. */
-    dispatcher: null,
-    holdTarget: null,
-    preCompute: null,
-    capturePromise: null,
+    /* The Capture Session owns the gesture + feedback arc (dispatcher, hold
+       target, pre-compute, ring/toast/clipboard, shared feedback timing).
+       content.js keeps only the Inspect Mode flags below. See ADR 0004. */
+    session: null,
+    /* HotkeyMatcher owns key tracking + Hotkey/Action-Key matching. */
+    matcher: null,
     /* True from Action-Key-Down until the capture animation ends. While true,
        mousemove must not re-render Highlight Layers, Capture Ring, or Info
        Panel; cursor updates remain allowed for toast placement. */
@@ -44,15 +38,17 @@
     panelSettingsKey: ''
   };
 
-  /* Track pressed non-modifier keys so we can detect "is hotkey held" */
-  const pressedKeys = new Set();
-
   function init() {
     globalThis.Overlay.init();
     state.scrollNavigator = globalThis.ScrollNavigator.createNavigator();
-    setupDispatcher();
+    state.matcher = globalThis.HotkeyMatcher.createMatcher({
+      getSettings: () => state.settings,
+      isActive: () => state.active
+    });
+    setupSession();
     attachWindowLifecycle();
     attachKeyListeners();
+    attachCursorTracking();
 
     globalThis.InspectSettings.load().then((settings) => {
       applySettings(settings);
@@ -62,29 +58,45 @@
     });
   }
 
-  function setupDispatcher() {
-    const dispatcher = globalThis.GestureDispatcher.createDispatcher();
-    /* Hold-progress ticks are intentionally ignored: the deep-blue Capture
-       Ring's mere presence communicates "key is pressed"; the colour switch
-       at threshold-cross is itself the threshold indicator. */
-    dispatcher.onTerminal((kind, payload) => {
-      if (kind === 'snippet') {
-        handleSnippet(payload);
-      } else if (kind === 'snapshot') {
-        handleSnapshot(payload);
-      } else if (kind === 'cancel') {
-        handleCancel(payload);
-      }
+  function setupSession() {
+    /* The Capture Session owns the whole capture act and signals two lifecycle
+       transitions back: onInspectExit (at a commit) and onSettled (when the
+       feedback window closes). content.js stays the Inspect Mode state machine.
+       See ADR 0004. */
+    state.session = globalThis.CaptureSession.createSession({
+      ring: globalThis.Overlay.captureRing,
+      toast: { show: (msg, rect) => globalThis.Overlay.showToast(msg, rect) },
+      clipboard: { write: writeClipboard },
+      snapshotPipeline: globalThis.SnapshotPipeline,
+      elementCopy: globalThis.ElementCopy,
+      getSettings: () => state.settings,
+      onInspectExit: onCaptureCommit,
+      onSettled: onCaptureSettled
     });
-    dispatcher.onZoneChange((zone) => {
-      if (zone === 'dead-zone') {
-        const target = state.holdTarget;
-        if (target) globalThis.Overlay.captureRing.startCharging(target);
-      }
-      /* snapshot-zone: no additional action — the snapshot terminal fires at
-         the same moment and drives startScan. */
-    });
-    state.dispatcher = dispatcher;
+  }
+
+  function onCaptureCommit() {
+    /* Commit terminal: end Inspect Mode immediately and engage the Capture
+       Latch. Highlight Layers and Info Panel disappear so the Capture Ring +
+       Toast own the screen during their shared feedback window. The Hotkey must
+       be released and pressed again before Inspect Mode can re-enter. */
+    state.captureLatched = true;
+    state.active = false;
+    state.target = null;
+    state.cachedStyle = null;
+    detachInspectListeners();
+    globalThis.Overlay.exitLockedTargetMode();
+    globalThis.Overlay.hideHighlightLayers();
+    globalThis.Overlay.hidePanel();
+  }
+
+  function onCaptureSettled() {
+    /* Feedback window closed (or a non-Dead-Zone cancel): release the lock and,
+       if still inspecting with the Hotkey held, resume the render loop. */
+    state.lifecycleLock = false;
+    if (state.active && state.matcher.isHeldNow()) {
+      scheduleRender();
+    }
   }
 
   function applySettings(settings) {
@@ -124,7 +136,7 @@
     if (entry && entry.gen === inspectCacheGeneration && entry.styleKey === key && entry.panelHtml) {
       return entry.panelHtml;
     }
-    const panelHtml = buildPanelHtml(el, cs);
+    const panelHtml = globalThis.InfoPanel.htmlFor(el, cs, state.settings);
     if (!entry) entry = {};
     entry.panelHtml = panelHtml;
     entry.styleKey = key;
@@ -135,14 +147,14 @@
 
   function attachWindowLifecycle() {
     window.addEventListener('blur', () => {
-      pressedKeys.clear();
-      if (state.dispatcher) state.dispatcher.cancel('blur');
+      state.matcher.clear();
+      if (state.session) state.session.cancel('blur');
       deactivate();
     });
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
-        pressedKeys.clear();
-        if (state.dispatcher) state.dispatcher.cancel('tab-switch');
+        state.matcher.clear();
+        if (state.session) state.session.cancel('tab-switch');
         deactivate();
       }
     });
@@ -153,30 +165,13 @@
     window.addEventListener('keyup', onKeyUp, { capture: true, passive: true });
   }
 
-  function isModifierKey(key) {
-    return key in MODIFIER_EVENT_MAP;
-  }
-
-  function hotkeyHeld(event) {
-    if (!state.settings || !state.settings.hotkey) return false;
-    const hotkey = state.settings.hotkey;
-
-    // If the hotkey is a modifier key, use the event flags
-    if (isModifierKey(hotkey.key)) {
-      return MODIFIER_EVENT_MAP[hotkey.key](event);
-    }
-
-    // Otherwise check our tracked set
-    return pressedKeys.has(hotkey.code);
-  }
-
-  function isHotkeyCurrentlyHeld() {
-    if (!state.settings || !state.settings.hotkey) return false;
-    const hotkey = state.settings.hotkey;
-    /* For modifier-key hotkeys we cannot inspect the current state without an
-       event — treat state.active as the authoritative signal instead. */
-    if (isModifierKey(hotkey.key)) return state.active;
-    return pressedKeys.has(hotkey.code);
+  /* The cursor must be known *before* Inspect Mode is entered: pressing the
+     Hotkey while the mouse is already resting on an element produced no render
+     (and a stale acquireTarget) because the only place cursor was tracked was
+     the inspect-scoped mousemove listener. This permanent, render-free listener
+     keeps state.cursor fresh at all times so activate() can paint immediately. */
+  function attachCursorTracking() {
+    window.addEventListener('mousemove', onMouseMove, { capture: true, passive: true });
   }
 
   function scrollNavigationActive() {
@@ -185,39 +180,26 @@
       && state.settings.scrollNavigation);
   }
 
-  function isPageScrollKey(event) {
-    const key = event.key;
-    if (key === ' ' || key === 'Spacebar') return true;
-    if (key === 'PageUp' || key === 'PageDown') return true;
-    if (key === 'Home' || key === 'End') return true;
-    return false;
-  }
-
   function onKeyDown(event) {
     if (!state.enabled) return;
 
-    if (scrollNavigationActive() && isPageScrollKey(event)) {
+    if (scrollNavigationActive() && state.matcher.isPageScrollKey(event)) {
       event.preventDefault();
       event.stopPropagation();
     }
 
     /* Esc during a hold cancels the gesture. Handled before hotkey checks
        so it works regardless of whether the hotkey is currently held. */
-    if (event.key === 'Escape' && state.dispatcher && state.dispatcher.isHolding()) {
-      state.dispatcher.cancel('esc');
+    if (event.key === 'Escape' && state.session && state.session.isHolding()) {
+      state.session.cancel('esc');
       return;
     }
 
-    // Track all non-modifier keys
-    if (!isModifierKey(event.key)) {
-      pressedKeys.add(event.code);
-    }
+    state.matcher.trackKeyDown(event);
 
-    if (hotkeyHeld(event)) {
+    if (state.matcher.isHeld(event)) {
       activate();
-
-      const actionCode = state.settings.actionKey && state.settings.actionKey.code;
-      if (state.active && actionCode && event.code === actionCode && !event.repeat) {
+      if (state.active && state.matcher.isActionKey(event) && !event.repeat) {
         event.preventDefault();
         event.stopPropagation();
         onActionKeyDown();
@@ -236,150 +218,37 @@
 
   function onActionKeyDown() {
     const target = acquireTarget();
-    if (!target || !state.dispatcher) return;
-    /* Lock entry: Info Panel and Highlight Layers are hidden immediately so
-       the Capture Ring owns the visual feedback for the gesture. The element
-       being captured is communicated by the ring's outline alone — the box-
-       model layers were tied to the Info Panel's inspection role. */
+    if (!target || !state.session) return;
+    /* Lock entry: Info Panel and Highlight Layers are hidden immediately so the
+       Capture Ring owns the visual feedback. The Capture Session takes the act
+       from here — ring, pre-compute, gesture, and feedback (ADR 0004). */
     state.lifecycleLock = true;
     globalThis.Overlay.hidePanel();
     globalThis.Overlay.hideHighlightLayers();
-    /* Target is locked at key-down. Cursor drift during the hold does not
-       retarget. */
-    state.holdTarget = target;
-    /* Capture Ring becomes visible the instant the Action Key is pressed —
-       deep-blue zone-1 state. It stays through both Hold-Gesture zones and
-       either pops (Snippet release) or transitions to scanning (threshold-
-       cross) at a terminal. */
-    globalThis.Overlay.captureRing.show(target);
-    /* Pre-Compute is speculative — abandoned if dispatcher cancels or commits
-       a snippet before the threshold crosses. */
-    state.preCompute = globalThis.SnapshotPipeline.startPreCompute(target);
-    state.dispatcher.actionKeyDown(target);
+    state.session.begin(target);
   }
 
   function onKeyUp(event) {
-    // Un-track released keys
-    if (!isModifierKey(event.key)) {
-      pressedKeys.delete(event.code);
-    }
+    state.matcher.trackKeyUp(event);
 
-    if (state.dispatcher && state.dispatcher.isHolding()) {
-      const actionCode = state.settings && state.settings.actionKey && state.settings.actionKey.code;
-      if (actionCode && event.code === actionCode) {
-        state.dispatcher.actionKeyUp();
-      } else if (!hotkeyHeld(event)) {
+    if (state.session && state.session.isHolding()) {
+      if (state.matcher.isActionKey(event)) {
+        state.session.actionKeyUp();
+      } else if (!state.matcher.isHeld(event)) {
         /* Hotkey released during a hold → cancel. */
-        state.dispatcher.cancel('hotkey-release');
+        state.session.cancel('hotkey-release');
       }
     }
 
     /* Capture Latch is released the moment the Hotkey leaves the keyboard,
        regardless of whether Inspect Mode is currently active. The next
        keydown on the Hotkey will then re-enter Inspect Mode normally. */
-    if (state.captureLatched && !hotkeyHeld(event)) {
+    if (state.captureLatched && !state.matcher.isHeld(event)) {
       state.captureLatched = false;
     }
 
     if (!state.active) return;
-    if (!hotkeyHeld(event)) deactivate();
-  }
-
-  function exitLifecycleLock() {
-    state.lifecycleLock = false;
-    if (state.active && isHotkeyCurrentlyHeld()) {
-      scheduleRender();
-    }
-  }
-
-  function clearGestureState() {
-    globalThis.Overlay.captureRing.hide();
-    globalThis.Overlay.exitLockedTargetMode();
-    state.holdTarget = null;
-    if (state.preCompute) {
-      state.preCompute.abort();
-      state.preCompute = null;
-    }
-    state.capturePromise = null;
-  }
-
-  function engageCaptureLatch() {
-    /* Commit terminal: end Inspect Mode immediately. Highlight Layers and
-       Info Panel disappear so the Capture Ring + Toast feedback owns the
-       screen during their shared 1200 ms lifecycle. The Hotkey must be
-       released and pressed again before Inspect Mode can re-enter. */
-    state.captureLatched = true;
-    state.active = false;
-    state.target = null;
-    state.cachedStyle = null;
-    detachInspectListeners();
-    globalThis.Overlay.exitLockedTargetMode();
-    globalThis.Overlay.hideHighlightLayers();
-    globalThis.Overlay.hidePanel();
-    state.holdTarget = null;
-    if (state.preCompute) {
-      state.preCompute.abort();
-      state.preCompute = null;
-    }
-    state.capturePromise = null;
-  }
-
-  function handleSnippet(target) {
-    /* Snippet: abandon Pre-Compute (no clipboard write from it), pop the
-       Capture Ring in deep-blue, engage the Capture Latch. clearGestureState
-       would hide the ring outright — we skip the ring.hide call here and let
-       the pop animation self-clean over the shared lifecycle. */
-    engageCaptureLatch();
-    onCopyShortcut(target);
-    setTimeout(exitLifecycleLock, globalThis.Overlay.CAPTURE_POP_MS + 20);
-  }
-
-  async function handleSnapshot(target) {
-    /* Snapshot fired at threshold-cross. Pre-Compute is already running.
-       The Capture Ring is already visible in its deep-blue active state —
-       startScan swaps the background to the rotating Gemini conic gradient
-       on the same ring, same position, same border thickness. Toast fires
-       synchronously with the scan so both end together (per ADR 0004). */
-    const preCompute = state.preCompute;
-    state.preCompute = null;
-    engageCaptureLatch();
-    globalThis.Overlay.captureRing.startScan(target);
-    globalThis.Overlay.showToast('Snapshot Copied!', target.getBoundingClientRect());
-    setTimeout(exitLifecycleLock, globalThis.Overlay.CAPTURE_SCAN_MS + 20);
-    if (!preCompute) return;
-    const includeScreenshot = !!(state.settings && state.settings.snapshot && state.settings.snapshot.includeScreenshot);
-    try {
-      let captureResult;
-      if (includeScreenshot) {
-        captureResult = await globalThis.SnapshotPipeline.capture(target);
-      } else {
-        captureResult = { box: globalThis.ElementCopy.boxFromRect(target), dataUrl: null };
-      }
-      const payload = await globalThis.SnapshotPipeline.commit(preCompute, captureResult);
-      if (!payload) return;
-      writeClipboard(payload);
-    } catch (_) {
-      /* Capture failure produces no toast — silent regression-safe. */
-    }
-  }
-
-  function handleCancel(reason) {
-    if (reason === 'dead-zone-release') {
-      /* Dead Zone cancel: ring was in .charging — fade it out cleanly.
-         No clipboard write, no toast. Lock exits on fade-end. */
-      globalThis.Overlay.exitLockedTargetMode();
-      state.holdTarget = null;
-      if (state.preCompute) {
-        state.preCompute.abort();
-        state.preCompute = null;
-      }
-      state.capturePromise = null;
-      globalThis.Overlay.captureRing.fadeFromCharging();
-      setTimeout(exitLifecycleLock, globalThis.Overlay.CAPTURE_FADE_MS + 20);
-      return;
-    }
-    clearGestureState();
-    exitLifecycleLock();
+    if (!state.matcher.isHeld(event)) deactivate();
   }
 
   function activate() {
@@ -392,6 +261,11 @@
     state.wheelState = { accum: 0, lastStepAt: 0 };
     cancelDeferredPanelUpdate();
     attachInspectListeners();
+    /* Paint immediately from the last known cursor — the mouse may already be
+       resting on the target with no further mousemove coming. Without this the
+       Highlight Layer / Info Panel (and any Action-Key target) would only
+       appear after the user nudged the mouse. */
+    scheduleRender();
   }
 
   function deactivate() {
@@ -410,7 +284,8 @@
     detachInspectListeners();
     state.target = null;
     state.cachedStyle = null;
-    clearGestureState();
+    if (state.session) state.session.clearVisuals();
+    globalThis.Overlay.exitLockedTargetMode();
     globalThis.Overlay.hideToast();
     globalThis.Overlay.hide();
   }
@@ -418,7 +293,6 @@
   function attachInspectListeners() {
     if (state.listenersAttached) return;
     state.listenersAttached = true;
-    window.addEventListener('mousemove', onMouseMove, { capture: true, passive: true });
     window.addEventListener('wheel', onWheel, { capture: true, passive: false });
     window.addEventListener('scroll', onInspectScroll, { capture: true, passive: true });
     window.addEventListener('resize', onInspectResize, { passive: true });
@@ -427,7 +301,6 @@
   function detachInspectListeners() {
     if (!state.listenersAttached) return;
     state.listenersAttached = false;
-    window.removeEventListener('mousemove', onMouseMove, { capture: true });
     window.removeEventListener('wheel', onWheel, { capture: true });
     window.removeEventListener('scroll', onInspectScroll, { capture: true });
     window.removeEventListener('resize', onInspectResize);
@@ -475,9 +348,11 @@
   }
 
   function onMouseMove(event) {
+    /* Permanent listener: always keep the cursor fresh so activate() can paint
+       from a resting mouse. Everything below is Inspect-Mode-only. */
     state.cursor.x = event.clientX;
     state.cursor.y = event.clientY;
-    if (state.lifecycleLock) return;
+    if (!state.active || state.lifecycleLock) return;
     if (state.pendingPanelEl) flushPendingPanelUpdate();
     scheduleRender();
   }
@@ -564,107 +439,6 @@
     if (state.scrollNavigator) state.scrollNavigator.setLeaf(leaf);
     const el = (state.scrollNavigator && state.scrollNavigator.current()) || leaf;
     paintTarget(el);
-  }
-
-  function buildPanelHtml(el, cs) {
-    const tag = el.tagName.toLowerCase();
-    const id = el.id ? `#${el.id}` : '';
-    const classes = el.classList.length ? '.' + Array.from(el.classList).join('.') : '';
-
-    const selectorHtml = `
-      <div class="selector">
-        <span class="sel-tag">${escapeHtml(tag)}</span>${
-          id ? `<span class="sel-id">${escapeHtml(id)}</span>` : ''
-        }${
-          classes ? `<span class="sel-class">${escapeHtml(classes)}</span>` : ''
-        }
-      </div>
-    `;
-
-    const enabled = (state.settings && state.settings.infoFields) || {};
-    const registry = (globalThis.InfoFields && globalThis.InfoFields.REGISTRY) || [];
-    const groups = (globalThis.InfoFields && globalThis.InfoFields.GROUPS) || [];
-
-    let textHtml = '';
-    const textField = registry.find((f) => f.id === 'text');
-    if (textField && enabled.text) {
-      const textResult = safeGetValue(textField, el, cs);
-      if (textResult) {
-        textHtml = renderFieldRow(textField.label, textResult);
-      }
-    }
-
-    const rowsByGroup = new Map();
-    for (const field of registry) {
-      if (field.id === 'text') continue;
-      if (!enabled[field.id]) continue;
-      const result = safeGetValue(field, el, cs);
-      if (!result) continue;
-      const rowHtml = renderFieldRow(field.label, result);
-      if (!rowHtml) continue;
-      if (!rowsByGroup.has(field.group)) rowsByGroup.set(field.group, []);
-      rowsByGroup.get(field.group).push(rowHtml);
-    }
-
-    let firstGroup = true;
-    let groupsHtml = '';
-    if (textHtml) firstGroup = false;
-    for (const group of groups) {
-      const rows = rowsByGroup.get(group.id);
-      if (!rows || !rows.length) continue;
-      const cls = firstGroup ? 'fields' : 'fields group';
-      groupsHtml += `<div class="${cls}">${rows.join('')}</div>`;
-      firstGroup = false;
-    }
-
-    const textBlock = textHtml ? `<div class="fields">${textHtml}</div>` : '';
-    return selectorHtml + textBlock + groupsHtml;
-  }
-
-  function safeGetValue(field, el, cs) {
-    try {
-      return field.getValue(el, cs);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  function renderFieldRow(label, value) {
-    if (!value) return '';
-    const text = value.text == null ? '' : String(value.text);
-    if (!text) return '';
-    if (value.kind === 'content') {
-      return `<div class="content-row"><span class="content-label">${escapeHtml(label)}</span><div class="content-value">${escapeHtml(text)}</div></div>`;
-    }
-    let valueHtml;
-    if (value.kind === 'color') {
-      valueHtml = renderSwatch(value.color) + escapeHtml(text);
-    } else {
-      valueHtml = escapeHtml(text);
-    }
-    return `<div class="row"><span class="label">${escapeHtml(label)}</span><span class="value">${valueHtml}</span></div>`;
-  }
-
-  function renderSwatch(color) {
-    return `<span class="swatch" style="background:${color}"></span>`;
-  }
-
-  function escapeHtml(s) {
-    return String(s)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-  }
-
-  function onCopyShortcut(target) {
-    const el = target || state.target;
-    if (!el) return;
-    const wrapTripleQuote = !state.settings || state.settings.snippetTripleQuoteBlock !== false;
-    const line = globalThis.ElementCopy.buildSnippet(el, { snippetTripleQuoteBlock: wrapTripleQuote });
-    writeClipboard(line);
-    globalThis.Overlay.captureRing.pop();
-    globalThis.Overlay.showToast('Copied!', el.getBoundingClientRect());
   }
 
   function writeClipboard(text) {

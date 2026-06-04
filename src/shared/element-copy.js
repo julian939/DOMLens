@@ -65,13 +65,9 @@
     /[a-f0-9]{6,}/i
   ];
 
-  function escapeHtml(s) {
-    return String(s)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-  }
+  const escapeHtml = (typeof module !== 'undefined' && module.exports)
+    ? require('./escape-html.js').escapeHtml
+    : globalThis.EscapeHtml.escapeHtml;
 
   function truncateAtWordBoundary(text, maxLen) {
     if (!text) return '';
