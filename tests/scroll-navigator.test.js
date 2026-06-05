@@ -4,13 +4,19 @@ const assert = require('assert');
 const { createNavigator, buildChain } = require('../src/shared/scroll-navigator.js');
 
 function fakeEl(tagName, parent) {
-  return {
+  const el = {
     tagName: tagName.toUpperCase(),
     nodeName: tagName.toUpperCase(),
     parentElement: parent || null,
+    children: [],
     isConnected: true,
     ownerDocument: { documentElement: { contains: () => true } }
   };
+  if (parent) {
+    if (!parent.children) parent.children = [];
+    parent.children.push(el);
+  }
+  return el;
 }
 
 function makeTree() {
@@ -93,7 +99,7 @@ test('setLeaf different node resets depth', () => {
 });
 
 test('single-element chain (body leaf) clamps without throwing', () => {
-  const { body } = makeTree();
+  const body = fakeEl('body', null);
   const nav = createNavigator();
   nav.setLeaf(body);
   assert.strictEqual(nav.current(), body);
@@ -108,6 +114,81 @@ test('detached anchor is treated as gone', () => {
   nav.setLeaf(detached);
   assert.strictEqual(nav.current(), null);
   assert.strictEqual(nav.step(1), false);
+});
+
+test('step -1 descends into closest child based on coordinates', () => {
+  const parent = fakeEl('div', null);
+  const child1 = fakeEl('span', parent);
+  const child2 = fakeEl('span', parent);
+
+  // Set mock getBoundingClientRect
+  child1.getBoundingClientRect = () => ({ left: 10, right: 20, top: 10, bottom: 20 });
+  child2.getBoundingClientRect = () => ({ left: 50, right: 60, top: 50, bottom: 60 });
+
+  const nav = createNavigator();
+  nav.setLeaf(parent);
+
+  // Close to child1 (at x=15, y=15)
+  assert.strictEqual(nav.step(-1, 15, 15), true);
+  assert.strictEqual(nav.current(), child1);
+});
+
+test('step -1 falls back to first child if no coordinates', () => {
+  const parent = fakeEl('div', null);
+  const child1 = fakeEl('span', parent);
+  const child2 = fakeEl('span', parent);
+
+  const nav = createNavigator();
+  nav.setLeaf(parent);
+
+  assert.strictEqual(nav.step(-1), true);
+  assert.strictEqual(nav.current(), child1);
+});
+
+test('jitter tracking: setLeaf on parent does not reset anchor if same leaf is hovered', () => {
+  const parent = fakeEl('div', null);
+  const child = fakeEl('span', parent);
+
+  const nav = createNavigator();
+  // Initially hovered element is parent
+  nav.setLeaf(parent);
+  assert.strictEqual(nav.current(), parent);
+
+  // Scroll down to child
+  assert.strictEqual(nav.step(-1), true);
+  assert.strictEqual(nav.current(), child);
+
+  // Hover is still parent (cursor moved slightly over parent), setLeaf(parent) called
+  nav.setLeaf(parent);
+  // Should keep child selected because hovered leaf (parent) didn't change!
+  assert.strictEqual(nav.current(), child);
+
+  // Moving mouse to a different element resets
+  const other = fakeEl('div', null);
+  nav.setLeaf(other);
+  assert.strictEqual(nav.current(), other);
+});
+
+test('step -1 skips zero-sized child elements when descending', () => {
+  const parent = fakeEl('div', null);
+  const child1 = fakeEl('span', parent);
+  const child2 = fakeEl('span', parent);
+
+  // child1 has zero size (hidden)
+  child1.offsetWidth = 0;
+  child1.offsetHeight = 0;
+
+  // child2 has non-zero size (visible)
+  child2.offsetWidth = 10;
+  child2.offsetHeight = 10;
+  child2.getBoundingClientRect = () => ({ left: 50, right: 60, top: 50, bottom: 60 });
+
+  const nav = createNavigator();
+  nav.setLeaf(parent);
+
+  // Even if cursor is close to child1, it should skip child1 and select child2
+  assert.strictEqual(nav.step(-1, 15, 15), true);
+  assert.strictEqual(nav.current(), child2);
 });
 
 let failed = 0;

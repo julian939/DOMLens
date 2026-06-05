@@ -301,38 +301,72 @@
     }, true);
   }
 
-  function clampToViewport(cursor, w, h, preferAbove) {
+  function findBestPanelPosition(cursor, w, h, elementRect) {
     const offset = 16;
     const { x, y } = cursor;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
 
-    if (preferAbove) {
-      let left = x + offset;
-      let top = y - h - 12;
+    // Candidate positions relative to the cursor (x, y)
+    const candidates = [
+      // 1. Right-Below (default)
+      { left: x + offset, top: y + offset },
+      // 2. Left-Below
+      { left: x - offset - w, top: y + offset },
+      // 3. Right-Above
+      { left: x + offset, top: y - offset - h },
+      // 4. Left-Above
+      { left: x - offset - w, top: y - offset - h }
+    ];
+
+    let bestPos = null;
+    let fallbackPos = null;
+
+    for (let i = 0; i < candidates.length; i++) {
+      const pos = candidates[i];
+      let left = pos.left;
+      let top = pos.top;
+
+      // Fit inside viewport bounds (with 4px boundary padding)
       if (left + w > vw - 4) left = Math.max(4, vw - w - 4);
-      if (top < 4) top = Math.min(vh - h - 4, y + 24);
-      return { left, top };
+      if (left < 4) left = 4;
+      if (top + h > vh - 4) top = Math.max(4, vh - h - 4);
+      if (top < 4) top = 4;
+
+      // Check if this position overlaps with the target element's rect
+      if (elementRect) {
+        const hasOverlap = !(left + w < elementRect.left ||
+                             left > elementRect.right ||
+                             top + h < elementRect.top ||
+                             top > elementRect.bottom);
+        if (!hasOverlap) {
+          bestPos = { left, top };
+          break;
+        }
+      }
+
+      if (!fallbackPos) {
+        fallbackPos = { left, top };
+      }
     }
 
-    let left = x + offset;
-    let top = y + offset;
-    if (left + w > vw - 4) left = Math.max(4, x - offset - w);
-    if (top + h > vh - 4) top = Math.max(4, y - offset - h);
-    return { left, top };
+    return bestPos || fallbackPos || { left: x + offset, top: y + offset };
   }
 
-  function positionPanel(cursor) {
+  function positionPanel(cursor, el) {
     const rect = panel.getBoundingClientRect();
-    const { left, top } = clampToViewport(cursor, rect.width, rect.height, false);
+    const elementRect = el && typeof el.getBoundingClientRect === 'function'
+      ? el.getBoundingClientRect()
+      : null;
+    const { left, top } = findBestPanelPosition(cursor, rect.width, rect.height, elementRect);
     panel.style.transform = `translate3d(${left}px, ${top}px, 0)`;
   }
 
-  function showPanel(panelHtml, cursor) {
+  function showPanel(panelHtml, cursor, el) {
     panel.innerHTML = panelHtml;
     panel.style.display = 'block';
     panel.style.transform = 'translate3d(0px, 0px, 0)';
-    positionPanel(cursor);
+    positionPanel(cursor, el);
   }
 
   function setPanelContent(panelHtml) {
@@ -343,7 +377,7 @@
 
   function showFor(el, cursor, panelHtml, cs) {
     renderHighlight(el, cs);
-    showPanel(panelHtml, cursor);
+    showPanel(panelHtml, cursor, el);
     show();
   }
 
@@ -352,9 +386,9 @@
     show();
   }
 
-  function repositionPanel(cursor) {
+  function repositionPanel(cursor, el) {
     if (!panel || panel.style.display === 'none') return;
-    positionPanel(cursor);
+    positionPanel(cursor, el);
   }
 
   /* Hide/show via the shadow-host's visibility so the layout tree stays put.

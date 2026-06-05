@@ -312,7 +312,7 @@
       return;
     }
     globalThis.Overlay.updateHighlight(state.target, state.cachedStyle);
-    globalThis.Overlay.repositionPanel(state.cursor);
+    globalThis.Overlay.repositionPanel(state.cursor, state.target);
   }
 
   function onInspectResize() {
@@ -321,7 +321,7 @@
       return;
     }
     globalThis.Overlay.updateHighlight(state.target, state.cachedStyle);
-    globalThis.Overlay.repositionPanel(state.cursor);
+    globalThis.Overlay.repositionPanel(state.cursor, state.target);
   }
 
   function onWheel(event) {
@@ -341,7 +341,7 @@
     if (!result.steps || !state.scrollNavigator) return;
 
     const direction = result.steps > 0 ? -1 : 1;
-    if (state.scrollNavigator.step(direction)) {
+    if (state.scrollNavigator.step(direction, state.cursor.x, state.cursor.y)) {
       const el = state.scrollNavigator.current();
       if (el) paintWheelTarget(el);
     }
@@ -383,6 +383,7 @@
       if (!state.active || state.pendingPanelEl !== state.target) return;
       const panelHtml = getCachedPanelHtml(state.target, state.cachedStyle);
       globalThis.Overlay.setPanelContent(panelHtml);
+      globalThis.Overlay.repositionPanel(state.cursor, state.target);
       state.pendingPanelEl = null;
     }, WHEEL_PANEL_DEBOUNCE_MS);
   }
@@ -395,6 +396,7 @@
     }
     const panelHtml = getCachedPanelHtml(state.target, state.cachedStyle);
     globalThis.Overlay.setPanelContent(panelHtml);
+    globalThis.Overlay.repositionPanel(state.cursor, state.target);
     state.pendingPanelEl = null;
   }
 
@@ -424,7 +426,7 @@
     }
 
     globalThis.Overlay.updateHighlight(el, state.cachedStyle);
-    globalThis.Overlay.repositionPanel(state.cursor);
+    globalThis.Overlay.repositionPanel(state.cursor, el);
   }
 
   function render() {
